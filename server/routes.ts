@@ -4,6 +4,7 @@ import {
   researchWorkWithAI,
   generateCharacterResponse,
   runAiTestSuite,
+  extractCleanErrorMessage,
 } from './gemini.js';
 import { runPrePublishSystemCheck } from './prepublish.js';
 import type { Character, Clue, MysteryRule } from '../src/types.js';
@@ -310,7 +311,14 @@ apiRouter.post('/admin/ai-research', checkAdminAuth, async (req, res) => {
     const research = await researchWorkWithAI(workTitle, author || '', excerpt);
     res.json(research);
   } catch (err: any) {
-    res.status(500).json({ error: err?.message || 'Nghiên cứu văn học thất bại.' });
+    const clean = extractCleanErrorMessage(err);
+    console.error('[Route /admin/ai-research] Error occurred:', clean.technicalDetails);
+    res.status(clean.statusCode || 500).json({
+      error: clean.userMessage,
+      technicalDetails: clean.technicalDetails,
+      isRetryable: clean.isRetryable,
+      statusCode: clean.statusCode,
+    });
   }
 });
 

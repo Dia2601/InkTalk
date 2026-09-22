@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
   BookOpen,
@@ -28,6 +28,8 @@ import {
   Lock,
   Check,
   MessageSquare,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import type {
   Character,
@@ -128,12 +130,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharId, setSelectedCharId] = useState<string>('');
 
-  // AI Research State
+  // AI Research State (Inputs preserved on any error)
   const [researchWorkTitle, setResearchWorkTitle] = useState('');
   const [researchAuthor, setResearchAuthor] = useState('');
   const [researchExcerpt, setResearchExcerpt] = useState('');
   const [researchLoading, setResearchLoading] = useState(false);
   const [researchResult, setResearchResult] = useState<any>(null);
+
+  // Requirement 4: State Machine: IDLE | RESEARCHING | RETRYING | SUCCESS | FAILED
+  type ResearchJobState = 'IDLE' | 'RESEARCHING' | 'RETRYING' | 'SUCCESS' | 'FAILED';
+  const [researchJobState, setResearchJobState] = useState<ResearchJobState>('IDLE');
+  const [researchRetryCount, setResearchRetryCount] = useState<number>(0);
+  const [researchError, setResearchError] = useState<{
+    message: string;
+    technicalDetails?: string;
+    isRetryable?: boolean;
+    statusCode?: number;
+  } | null>(null);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
+  const isResearchRunningRef = useRef<boolean>(false);
 
   // Pre-Publish & Test Suite State
   const [prePublishReport, setPrePublishReport] = useState<PrePublishReport | null>(null);
@@ -454,25 +469,96 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Handle AI Research Engine
+  // Handle AI Research Engine with Automatic Retry (Max 3, Exponential Backoff) & Model Fallback
   const handleRunAiResearch = async () => {
-    if (!token || !researchWorkTitle) return;
-    setResearchLoading(true);
-    setNotice(null);
-    try {
-      const result = await runAiResearch(
-        token,
-        researchWorkTitle,
-        researchAuthor,
-        researchExcerpt
-      );
-      setResearchResult(result);
-      setNotice('AI đã hoàn tất phân tích tác phẩm. Bạn có thể duyệt và nhập dữ liệu!');
-    } catch (err: any) {
-      setNotice('Lỗi nghiên cứu AI: ' + err?.message);
-    } finally {
-      setResearchLoading(false);
+    // Requirement 3: Prevent duplicate parallel requests
+    if (isResearchRunningRef.current) return;
+    if (!token || !researchWorkTitle?.trim()) {
+      setNotice('Vui lòng nhập tên tác phẩm để khởi động nghiên cứu AI.');
+      return;
     }
+
+    isResearchRunningRef.current = true;
+    setResearchLoading(true);
+    setResearchJobState('RESEARCHING');
+    setResearchRetryCount(0);
+    setResearchError(null);
+    setShowTechnicalDetails(false);
+
+    // Exponential backoff delays: Lần 1: 1.5s, Lần 2: 3.5s, Lần 3: 7.0s
+    const retryDelays = [1500, 3500, 7000];
+    let lastError: any = null;
+    let successResult: any = null;
+
+    for (let attempt = 0; attempt <= 3; attempt++) {
+      if (attempt > 0) {
+        setResearchJobState('RETRYING');
+        setResearchRetryCount(attempt);
+      }
+
+      try {
+        const result = await runAiResearch(
+          token,
+          researchWorkTitle.trim(),
+          researchAuthor.trim(),
+          researchExcerpt.trim()
+        );
+        successResult = result;
+        lastError = null;
+        break; // Successfully completed!
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Admin AI Research] Attempt ${attempt + 1} failed:`, err);
+
+        // Check if error is temporary/retryable (503, 429, 502, 504, UNAVAILABLE, etc.)
+        const isRetryable =
+          err?.isRetryable ??
+          (err?.statusCode === 503 ||
+            err?.statusCode === 429 ||
+            err?.statusCode === 502 ||
+            err?.statusCode === 504 ||
+            String(err?.message || '').includes('quá tải') ||
+            String(err?.message || '').includes('503'));
+
+        // If error is not retryable (e.g. 400 Bad Request, 401 Unauthorized), stop immediately
+        if (!isRetryable || attempt >= 3) {
+          break;
+        }
+
+        // Wait with exponential backoff before the next attempt
+        const delay = retryDelays[attempt] || 4000;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    if (successResult) {
+      setResearchResult(successResult);
+      setResearchJobState('SUCCESS');
+      setResearchError(null);
+      setNotice(`AI đã hoàn tất nghiên cứu tác phẩm: "${researchWorkTitle.trim()}". Bạn có thể duyệt và lưu vào kho.`);
+    } else {
+      // Requirement 7 & 8: Preserve input, do NOT crash, do NOT wipe fields
+      setResearchJobState('FAILED');
+      const isRetryable = lastError?.isRetryable ?? true;
+      const cleanMessage = isRetryable
+        ? 'AI Research Engine hiện chưa thể kết nối. Vui lòng thử lại sau ít phút.'
+        : (lastError?.message || 'AI Research Engine hiện chưa thể kết nối.');
+      const cleanTechnical =
+        lastError?.technicalDetails ||
+        (lastError?.statusCode ? `HTTP ${lastError.statusCode}` : 'Service Unavailable');
+
+      setResearchError({
+        message: cleanMessage,
+        technicalDetails: cleanTechnical,
+        isRetryable,
+        statusCode: lastError?.statusCode || 503,
+      });
+      // Do NOT set raw JSON error into notice banner!
+      setNotice(null);
+    }
+
+    setResearchLoading(false);
+    isResearchRunningRef.current = false;
   };
 
   // Import Character from AI Research
@@ -1616,15 +1702,127 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       />
                     </div>
 
-                    <button
-                      onClick={handleRunAiResearch}
-                      disabled={researchLoading || !researchWorkTitle}
-                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F3B8C8] via-[#F5D889] to-[#A9D8F5] font-bold text-xs text-[#332B35] shadow-xs hover:shadow-md transition-all flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>{researchLoading ? 'AI Đang Phân Tích Tác Phẩm...' : 'Khởi Động Nghiên Cứu AI'}</span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={handleRunAiResearch}
+                        disabled={researchLoading || !researchWorkTitle.trim()}
+                        className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-all flex items-center space-x-2 cursor-pointer ${
+                          researchLoading
+                            ? 'bg-[#EADED2] text-[#7A6B72] cursor-not-allowed opacity-80'
+                            : researchJobState === 'SUCCESS'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                            : researchJobState === 'FAILED'
+                            ? 'bg-rose-100 text-rose-800 border border-rose-300 hover:bg-rose-200'
+                            : 'bg-gradient-to-r from-[#F3B8C8] via-[#F5D889] to-[#A9D8F5] text-[#332B35] hover:shadow-md'
+                        }`}
+                      >
+                        {researchJobState === 'RESEARCHING' && (
+                          <>
+                            <RotateCw className="w-4 h-4 animate-spin text-[#332B35]" />
+                            <span>🔍 Đang nghiên cứu tác phẩm...</span>
+                          </>
+                        )}
+                        {researchJobState === 'RETRYING' && (
+                          <>
+                            <RotateCw className="w-4 h-4 animate-spin text-[#332B35]" />
+                            <span>🔄 AI đang bận. Đang thử kết nối lại ({researchRetryCount}/3)...</span>
+                          </>
+                        )}
+                        {researchJobState === 'IDLE' && (
+                          <>
+                            <Sparkles className="w-4 h-4" />
+                            <span>Khởi Động Nghiên Cứu AI</span>
+                          </>
+                        )}
+                        {researchJobState === 'SUCCESS' && (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                            <span>✓ Nghiên cứu hoàn tất (Khởi động lại)</span>
+                          </>
+                        )}
+                        {researchJobState === 'FAILED' && (
+                          <>
+                            <RotateCw className="w-4 h-4 text-rose-700" />
+                            <span>🔄 Thử Lại Nghiên Cứu AI</span>
+                          </>
+                        )}
+                      </button>
+
+                      {researchJobState === 'SUCCESS' && (
+                        <span className="text-emerald-700 font-semibold text-xs flex items-center space-x-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Dữ liệu đã sẵn sàng để duyệt bên dưới</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* RETRYING BANNER */}
+                  {researchJobState === 'RETRYING' && (
+                    <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center space-x-3 text-xs animate-pulse">
+                      <RotateCw className="w-4 h-4 animate-spin text-amber-600 shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-bold">AI Research Engine đang tạm thời quá tải. Hệ thống sẽ tự động thử lại.</p>
+                        <p className="text-amber-700 text-[11px] mt-0.5">🔄 Đang thử kết nối lại (Lần {researchRetryCount}/3)...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* FAILED STATE BANNER (NO RAW JSON, FRIENDLY COPY, INPUTS PRESERVED) */}
+                  {researchJobState === 'FAILED' && researchError && (
+                    <div className="p-4 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs space-y-3 shadow-xs">
+                      <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+                        <div className="flex items-start space-x-3">
+                          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h5 className="font-bold text-rose-900 text-sm">AI Research Engine tạm thời không khả dụng.</h5>
+                            <p className="text-rose-700">{researchError.message}</p>
+                            <p className="text-rose-600 text-[11px] italic">
+                              * Chưa hoàn tất nghiên cứu vì AI Research Engine chưa kết nối được. Toàn bộ thông tin tác phẩm bạn nhập được giữ nguyên vẹn.
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={handleRunAiResearch}
+                          disabled={researchLoading}
+                          className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shadow-xs shrink-0 cursor-pointer disabled:opacity-50 flex items-center space-x-1.5"
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                          <span>THỬ LẠI</span>
+                        </button>
+                      </div>
+
+                      {/* Technical Details: Collapsed by default (Requirement 11) */}
+                      {researchError.technicalDetails && (
+                        <div className="pt-2 border-t border-rose-200/60">
+                          <button
+                            type="button"
+                            onClick={() => setShowTechnicalDetails((prev) => !prev)}
+                            className="flex items-center space-x-1.5 text-[11px] font-bold text-rose-800 hover:text-rose-950 cursor-pointer"
+                          >
+                            <span>Chi tiết kỹ thuật</span>
+                            {showTechnicalDetails ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+
+                          {showTechnicalDetails && (
+                            <div className="mt-2 p-2.5 rounded-xl bg-white/90 border border-rose-200 font-mono text-[11px] text-rose-950 break-words leading-relaxed">
+                              <div className="flex items-center space-x-2 text-[10px] text-rose-700 font-bold mb-1">
+                                <span>MÃ: {researchError.statusCode || 503}</span>
+                                <span>•</span>
+                                <span>TRẠNG THÁI: {researchError.isRetryable ? 'CÓ THỂ THỬ LẠI (TEMPORARY OVERLOAD)' : 'CẦN KIỂM TRA THIẾT LẬP'}</span>
+                              </div>
+                              <p>{researchError.technicalDetails}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Research Results Preview & Approval */}
                   {researchResult && (

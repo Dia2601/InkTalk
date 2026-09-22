@@ -76,6 +76,121 @@ export interface LiteraryResearchResult {
   uncertaintyReport: string[];
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export function isRetryableAiError(error: any): boolean {
+  if (!error) return false;
+  const status = error.status || error.statusCode || error.code;
+  if (
+    status === 503 ||
+    status === 429 ||
+    status === 502 ||
+    status === 504 ||
+    status === 'UNAVAILABLE' ||
+    status === 'RESOURCE_EXHAUSTED'
+  ) {
+    return true;
+  }
+  const str = String(error.message || error.stack || error || '').toLowerCase();
+  return (
+    str.includes('503') ||
+    str.includes('unavailable') ||
+    str.includes('high demand') ||
+    str.includes('overloaded') ||
+    str.includes('temporar') ||
+    str.includes('spikes in demand') ||
+    str.includes('429') ||
+    str.includes('resource_exhausted') ||
+    str.includes('quota') ||
+    str.includes('rate limit') ||
+    str.includes('502') ||
+    str.includes('504') ||
+    str.includes('timeout') ||
+    str.includes('etimedout') ||
+    str.includes('econnreset') ||
+    str.includes('fetch failed') ||
+    str.includes('network')
+  );
+}
+
+export function extractCleanErrorMessage(error: any): {
+  userMessage: string;
+  technicalDetails: string;
+  isRetryable: boolean;
+  statusCode: number;
+} {
+  const isRetryable = isRetryableAiError(error);
+  let statusCode = 500;
+  if (typeof error?.status === 'number') statusCode = error.status;
+  else if (typeof error?.statusCode === 'number') statusCode = error.statusCode;
+
+  const rawMsg = String(error?.message || error || '');
+  let extractedTechnical = rawMsg;
+
+  // Extract clean message if rawMsg contains JSON
+  try {
+    const jsonMatch = rawMsg.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed?.error?.message) {
+        extractedTechnical = `${parsed.error.status || 'UNAVAILABLE'} (${parsed.error.code || 503}): ${parsed.error.message}`.trim();
+        if (parsed.error.code) statusCode = parsed.error.code;
+      }
+    }
+  } catch {
+    // Ignore JSON parsing issues
+  }
+
+  if (
+    isRetryable ||
+    rawMsg.includes('503') ||
+    rawMsg.includes('UNAVAILABLE') ||
+    rawMsg.includes('high demand') ||
+    rawMsg.includes('spikes in demand')
+  ) {
+    return {
+      userMessage: 'AI Research Engine đang tạm thời quá tải. Hệ thống sẽ tự động thử lại.',
+      technicalDetails: (extractedTechnical || 'HTTP 503 UNAVAILABLE - Model temporarily overloaded').replace(/\n\s*/g, ' ').slice(0, 300),
+      isRetryable: true,
+      statusCode: 503,
+    };
+  }
+
+  if (rawMsg.includes('429') || rawMsg.includes('quota') || rawMsg.includes('rate limit')) {
+    return {
+      userMessage: 'Đã đạt giới hạn tần suất yêu cầu AI trong thời gian ngắn. Vui lòng đợi giây lát rồi thử lại.',
+      technicalDetails: (extractedTechnical || 'HTTP 429 RESOURCE_EXHAUSTED - Rate limit reached').replace(/\n\s*/g, ' ').slice(0, 300),
+      isRetryable: true,
+      statusCode: 429,
+    };
+  }
+
+  if (rawMsg.includes('401') || rawMsg.includes('API key') || rawMsg.includes('API_KEY')) {
+    return {
+      userMessage: 'Chưa cấu hình hoặc API Key AI không hợp lệ. Vui lòng kiểm tra thiết lập máy chủ.',
+      technicalDetails: 'HTTP 401 UNAUTHENTICATED - Missing or invalid GEMINI_API_KEY',
+      isRetryable: false,
+      statusCode: 401,
+    };
+  }
+
+  if (rawMsg.includes('404')) {
+    return {
+      userMessage: 'Mô hình AI nghiên cứu không tồn tại hoặc đã thay đổi cấu hình.',
+      technicalDetails: (extractedTechnical || 'HTTP 404 NOT_FOUND').replace(/\n\s*/g, ' ').slice(0, 300),
+      isRetryable: false,
+      statusCode: 404,
+    };
+  }
+
+  return {
+    userMessage: 'AI Research Engine hiện chưa thể kết nối. Vui lòng thử lại sau ít phút.',
+    technicalDetails: (extractedTechnical || `HTTP ${statusCode} Server Error`).replace(/\n\s*/g, ' ').slice(0, 300),
+    isRetryable,
+    statusCode,
+  };
+}
+
 export async function researchWorkWithAI(
   workTitle: string,
   author: string,
@@ -83,7 +198,9 @@ export async function researchWorkWithAI(
 ): Promise<LiteraryResearchResult> {
   const ai = getGenAI();
   if (!ai) {
-    throw new Error('GEMINI_API_KEY chưa được cấu hình trên server.');
+    const error: any = new Error('Chưa cấu hình GEMINI_API_KEY trên máy chủ.');
+    error.status = 401;
+    throw error;
   }
 
   const prompt = `
@@ -116,24 +233,67 @@ Yêu cầu dữ liệu trả về theo đúng định dạng JSON:
 6. UncertaintyReport: các chi tiết còn nhiều tranh cãi hoặc dị bản văn học nếu có.
 `;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      systemInstruction:
-        'Bạn là chuyên gia nghiên cứu văn học THPT Việt Nam. Chỉ trả về JSON hợp lệ theo cấu trúc yêu cầu, không thêm chữ nào ngoài JSON.',
-    },
-  });
+  // Candidate models from the @google/genai guidelines:
+  // Primary: gemini-3.8-flash
+  // Fallbacks: gemini-flash-latest, gemini-3.1-flash-lite
+  const modelCandidates = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  // Exponential backoff delays: Attempt 1 -> 1.5s, Attempt 2 -> 3.5s, Attempt 3 -> 7s
+  const retryDelays = [1500, 3500, 7000];
 
-  const text = response.text || '{}';
-  try {
-    const parsed = JSON.parse(text);
-    return parsed as LiteraryResearchResult;
-  } catch (err) {
-    console.error('Failed to parse Gemini research output:', text);
-    throw new Error('Không thể phân tích dữ liệu nghiên cứu từ AI. Vui lòng thử lại.');
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt <= 3; attempt++) {
+    // Select model candidate with fallback progression
+    const modelToUse = modelCandidates[Math.min(attempt, modelCandidates.length - 1)];
+
+    try {
+      console.log(`[AI Research Engine] Attempt ${attempt + 1}/4 using model '${modelToUse}' for '${workTitle}'...`);
+
+      const response = await ai.models.generateContent({
+        model: modelToUse,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          systemInstruction:
+            'Bạn là chuyên gia nghiên cứu văn học THPT Việt Nam. Chỉ trả về JSON hợp lệ theo cấu trúc yêu cầu, không thêm chữ nào ngoài JSON.',
+        },
+      });
+
+      const text = response.text || '{}';
+      try {
+        const parsed = JSON.parse(text);
+        console.log(`[AI Research Engine] Successfully analyzed '${workTitle}' with model '${modelToUse}'.`);
+        return parsed as LiteraryResearchResult;
+      } catch (parseErr) {
+        console.error('Failed to parse Gemini research output:', text);
+        throw new Error('Dữ liệu nghiên cứu từ AI không đúng định dạng JSON.');
+      }
+    } catch (err: any) {
+      lastError = err;
+      const retryable = isRetryableAiError(err);
+      console.warn(
+        `[AI Research Engine] Attempt ${attempt + 1} failed: ${err?.message || err}. Retryable: ${retryable}`
+      );
+
+      // If not retryable (e.g. 400 Bad Request, 401 Unauthorized), do not retry
+      if (!retryable || attempt === 3) {
+        break;
+      }
+
+      // Exponential backoff wait before retrying
+      const delay = retryDelays[attempt] || 4000;
+      console.log(`[AI Research Engine] Waiting ${delay}ms before next retry...`);
+      await sleep(delay);
+    }
   }
+
+  // If all attempts failed, throw structured error
+  const clean = extractCleanErrorMessage(lastError);
+  const structuredError: any = new Error(clean.userMessage);
+  structuredError.technicalDetails = clean.technicalDetails;
+  structuredError.isRetryable = clean.isRetryable;
+  structuredError.statusCode = clean.statusCode;
+  throw structuredError;
 }
 
 export interface CharacterChatParams {
@@ -238,16 +398,37 @@ Trước khi nói, tự kiểm tra: Có đúng giọng ${character.name}? Có b�
         formattedHistory.push({ role: 'user', parts: [{ text: userMessage }] });
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: formattedHistory,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        },
-      });
+      // Model candidates with fallback if 503 occurs
+      const chatModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+      let lastChatErr: any = null;
 
-      replyText = (response.text || '').trim();
+      for (const m of chatModels) {
+        try {
+          const response = await ai.models.generateContent({
+            model: m,
+            contents: formattedHistory,
+            config: {
+              systemInstruction,
+              temperature: 0.7,
+            },
+          });
+          replyText = (response.text || '').trim();
+          lastChatErr = null;
+          break;
+        } catch (mErr: any) {
+          lastChatErr = mErr;
+          if (isRetryableAiError(mErr)) {
+            console.warn(`[Character Chat] Model ${m} failed with temporary error, trying fallback model...`);
+            await sleep(1000);
+            continue;
+          }
+          break;
+        }
+      }
+
+      if (lastChatErr && !replyText) {
+        throw lastChatErr;
+      }
     } catch (apiErr) {
       console.error('Gemini API Error in Character Chat:', apiErr);
       throw apiErr;

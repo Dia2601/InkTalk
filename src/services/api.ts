@@ -236,13 +236,43 @@ export async function runAiResearch(
   author: string,
   excerpt?: string
 ) {
-  const res = await fetch(`${BASE_URL}/admin/ai-research`, {
-    method: 'POST',
-    headers: adminHeaders(token),
-    body: JSON.stringify({ workTitle, author, excerpt }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Nghiên cứu văn học AI thất bại.');
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/admin/ai-research`, {
+      method: 'POST',
+      headers: adminHeaders(token),
+      body: JSON.stringify({ workTitle, author, excerpt }),
+    });
+  } catch (networkErr: any) {
+    const netError: any = new Error(
+      'Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền mạng và thử lại.'
+    );
+    netError.technicalDetails = networkErr?.message || 'Network / Fetch failed';
+    netError.isRetryable = true;
+    netError.statusCode = 0;
+    throw netError;
+  }
+
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
+  if (!res.ok) {
+    const errorObj: any = new Error(
+      data.error || 'AI Research Engine hiện chưa thể kết nối. Vui lòng thử lại sau ít phút.'
+    );
+    errorObj.technicalDetails = data.technicalDetails || `HTTP ${res.status} ${res.statusText || ''}`.trim();
+    errorObj.isRetryable =
+      data.isRetryable !== undefined
+        ? data.isRetryable
+        : res.status === 503 || res.status === 429 || res.status === 502 || res.status === 504;
+    errorObj.statusCode = res.status;
+    throw errorObj;
+  }
+
   return data;
 }
 

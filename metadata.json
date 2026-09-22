@@ -1,0 +1,6 @@
+{
+  "name": "InkTalk — Văn học & Manh mối THPT",
+  "description": "Nền tảng AI Character Chat kết hợp khám phá tác phẩm văn học và điều tra manh mối THPT.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

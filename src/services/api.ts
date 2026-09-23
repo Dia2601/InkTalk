@@ -352,3 +352,110 @@ export async function getAdminMysteryRule(
   if (!res.ok) return null;
   return res.json();
 }
+
+// Versioning
+export async function getCharacterVersions(token: string, characterId: string) {
+  const res = await fetch(`${BASE_URL}/admin/characters/${characterId}/versions`, {
+    headers: adminHeaders(token),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function revertCharacterVersion(token: string, characterId: string, versionNumber: number) {
+  const res = await fetch(`${BASE_URL}/admin/characters/${characterId}/versions/${versionNumber}/revert`, {
+    method: 'POST',
+    headers: adminHeaders(token),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Khôi phục phiên bản thất bại.');
+  return data;
+}
+
+// Auto-Save Drafts
+export async function saveCharacterDraft(token: string, characterId: string | undefined, formData: any) {
+  const res = await fetch(`${BASE_URL}/admin/characters/draft`, {
+    method: 'POST',
+    headers: adminHeaders(token),
+    body: JSON.stringify({ characterId, formData }),
+  });
+  return res.json();
+}
+
+export async function getCharacterDraft(token: string, characterId?: string) {
+  const url = characterId
+    ? `${BASE_URL}/admin/characters/draft?characterId=${encodeURIComponent(characterId)}`
+    : `${BASE_URL}/admin/characters/draft`;
+  const res = await fetch(url, {
+    headers: adminHeaders(token),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.draft;
+}
+
+export async function deleteCharacterDraft(token: string, characterId?: string) {
+  const url = characterId
+    ? `${BASE_URL}/admin/characters/draft?characterId=${encodeURIComponent(characterId)}`
+    : `${BASE_URL}/admin/characters/draft`;
+  await fetch(url, {
+    method: 'DELETE',
+    headers: adminHeaders(token),
+  });
+}
+
+// AI Research Records Persistence
+export async function getLatestResearchRecord(token: string) {
+  const res = await fetch(`${BASE_URL}/admin/ai-research/latest`, {
+    headers: adminHeaders(token),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.record;
+}
+
+export async function getResearchRecords(token: string) {
+  const res = await fetch(`${BASE_URL}/admin/ai-research/records`, {
+    headers: adminHeaders(token),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+// Database Audit, Backup & Restore
+export async function getDataIntegrityReport(token: string) {
+  const res = await fetch(`${BASE_URL}/admin/database/integrity-check`, {
+    headers: adminHeaders(token),
+  });
+  if (!res.ok) throw new Error('Không thể lấy báo cáo toàn vẹn dữ liệu.');
+  return res.json();
+}
+
+export async function exportDatabase(token: string) {
+  const res = await fetch(`${BASE_URL}/admin/database/export`, {
+    headers: adminHeaders(token),
+  });
+  if (!res.ok) throw new Error('Không thể xuất dữ liệu sao lưu.');
+  return res.json();
+}
+
+export async function createBackup(token: string) {
+  const res = await fetch(`${BASE_URL}/admin/database/create-backup`, {
+    method: 'POST',
+    headers: adminHeaders(token),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error('Không thể tạo bản sao lưu.');
+  return data;
+}
+
+export async function restoreDatabase(token: string, backupData: any) {
+  const res = await fetch(`${BASE_URL}/admin/database/restore`, {
+    method: 'POST',
+    headers: adminHeaders(token),
+    body: JSON.stringify(backupData),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Khôi phục cơ sở dữ liệu thất bại.');
+  return data;
+}

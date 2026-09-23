@@ -1,4 +1,5 @@
 export type CharacterBadge = 'main' | 'sub' | 'unexpected';
+export type CharacterStatus = 'DRAFT' | 'REVIEW' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
 
 export interface User {
   id: string;
@@ -37,7 +38,64 @@ export interface Character {
   shortIntro: string;
   imageUrl: string; // Provided by Admin upload (Mandatory for publish)
   isPublished: boolean;
+  status?: CharacterStatus;
+  version?: number;
+  updatedAt?: string;
   createdAt: string;
+}
+
+export interface CharacterVersion {
+  id: string;
+  characterId: string;
+  versionNumber: number;
+  snapshotData: Character;
+  changeSummary: string;
+  createdAt: string;
+}
+
+export interface CharacterDraft {
+  id: string;
+  characterId?: string;
+  formData: any;
+  lastSavedAt: string;
+}
+
+export interface ResearchRecord {
+  id: string;
+  workTitle: string;
+  author: string;
+  workAuthor?: string;
+  excerpt?: string;
+  status: 'QUEUED' | 'RUNNING' | 'SUCCESS' | 'FAILED';
+  result?: any;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DataIntegrityReport {
+  timestamp: string;
+  worksCount: number;
+  charactersCount: number;
+  charactersByStatus: Record<string, number>;
+  versionsCount: number;
+  draftsCount: number;
+  imagesCount: number;
+  cluesCount: number;
+  mysteryRulesCount: number;
+  researchRecordsCount: number;
+  usersCount: number;
+  sessionsCount: number;
+  messagesCount: number;
+  backupsCount: number;
+  checks: {
+    databaseEngine: string;
+    walMode: boolean;
+    atomicPersistence: boolean;
+    diskStorageAccessible: boolean;
+    circuitBreakerState: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+    dataIntegrityPassed: boolean;
+  };
 }
 
 export interface Clue {
@@ -169,3 +227,4 @@ export interface AiTestSuiteReport {
   totalCount: number;
   results: AiTestCaseResult[];
 }
+

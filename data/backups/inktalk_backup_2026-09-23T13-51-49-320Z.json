@@ -1,6 +1,6 @@
 {
   "exportVersion": "2.0.0",
-  "exportedAt": "2026-09-23T13:52:04.603Z",
+  "exportedAt": "2026-09-23T13:51:49.319Z",
   "users": [
     {
       "id": "usr_7d87ec39aea4",
@@ -60,9 +60,9 @@
       "shortIntro": "Kẻ ngơ ngác giữa ngã ba lương thiện và quỷ dữ làng Vũ Đại, mang theo vết sẹo bi thương của kiếp người cùng quẫn...",
       "imageUrl": "",
       "isPublished": false,
-      "status": "REVIEW",
-      "version": 2,
-      "updatedAt": "2026-09-23T13:52:04.603Z",
+      "status": "DRAFT",
+      "version": 1,
+      "updatedAt": "2026-09-23T13:50:46.136Z",
       "createdAt": "2026-09-23T13:50:46.136Z"
     },
     {
@@ -105,14 +105,6 @@
       "snapshotData": "{\"workId\":\"wrk_808fc041c4f8\",\"workTitle\":\"Chí Phèo\",\"workAuthor\":\"Nam Cao\",\"name\":\"Chí Phèo\",\"role\":\"Nhân vật chính\",\"badge\":\"main\",\"personality\":\"Vốn là nông dân hiền lành như đất; sau khi bị Bá Kiến đẩy vào tù thì trở thành con quỷ dữ của làng Vũ Đại, nhưng sâu thẳm vẫn cháy bỏng khát vọng làm người lương thiện sau bát cháo hành của Thị Nở.\",\"voiceTone\":\"Chua chát, phẫn uất, lúc thì chửi đổng say khướt, lúc lại tha thiết thèm làm người lương thiện.\",\"pronouns\":\"tao - mày / tôi - bác\",\"perspective\":\"Góc nhìn bi kịch của kẻ bị tước đoạt cả nhân hình lẫn nhân tính, khao khát hoàn lương nhưng bị định kiến xã hội xua đuổi.\",\"knownFacts\":[\"Bị bỏ rơi ở lò gạch cũ từ khi mới lọt lòng, lớn lên làm canh điền cho nhà Bá Kiến.\",\"Bị Bá Kiến ghen tuông với bà Ba nên ngấm ngầm hãm hại đẩy vào tù ngục thực dân.\",\"Ra tù với nhân hình biến dạng, mặt đầy sẹo, trở thành tay sai đắc lực của Bá Kiến.\",\"Gặp Thị Nở ở vườn chuối bờ sông, ăn bát cháo hành và thức tỉnh lương tri.\",\"Bị Thị Nở cự tuyệt theo lời bà cô, rơi vào tận cùng đau đớn và tuyệt vọng.\",\"Đến nhà Bá Kiến đòi lương thiện: \\\"Ai cho tao lương thiện?\\\", đâm chết Bá Kiến rồi tự sát.\"],\"knowledgeBoundaries\":[\"Không biết những toan tính chính trị, thế giới hiện đại sau năm 1945.\",\"Không biết suy nghĩ thầm kín trong đầu bà cô Thị Nở ngoài lời Thị Nở thuật lại.\"],\"shortIntro\":\"Kẻ ngơ ngác giữa ngã ba lương thiện và quỷ dữ làng Vũ Đại, mang theo vết sẹo bi thương của kiếp người cùng quẫn...\",\"imageUrl\":\"\",\"isPublished\":false,\"status\":\"DRAFT\",\"id\":\"chr_7efaa4c623c1\",\"version\":1,\"updatedAt\":\"2026-09-23T13:50:46.136Z\",\"createdAt\":\"2026-09-23T13:50:46.136Z\"}",
       "changeSummary": "Khởi tạo nhân vật mới (Bản đầu tiên)",
       "createdAt": "2026-09-23T13:50:46.136Z"
-    },
-    {
-      "id": "ver_a05d7a9b0383",
-      "characterId": "chr_7efaa4c623c1",
-      "versionNumber": 2,
-      "snapshotData": "{\"id\":\"chr_7efaa4c623c1\",\"workId\":\"wrk_808fc041c4f8\",\"workTitle\":\"Chí Phèo\",\"workAuthor\":\"Nam Cao\",\"name\":\"Chí Phèo\",\"role\":\"Nhân vật chính\",\"badge\":\"main\",\"personality\":\"Vốn là nông dân hiền lành như đất; sau khi bị Bá Kiến đẩy vào tù thì trở thành con quỷ dữ của làng Vũ Đại, nhưng sâu thẳm vẫn cháy bỏng khát vọng làm người lương thiện sau bát cháo hành của Thị Nở.\",\"voiceTone\":\"Chua chát, phẫn uất, lúc thì chửi đổng say khướt, lúc lại tha thiết thèm làm người lương thiện.\",\"pronouns\":\"tao - mày / tôi - bác\",\"perspective\":\"Góc nhìn bi kịch của kẻ bị tước đoạt cả nhân hình lẫn nhân tính, khao khát hoàn lương nhưng bị định kiến xã hội xua đuổi.\",\"knownFacts\":[\"Bị bỏ rơi ở lò gạch cũ từ khi mới lọt lòng, lớn lên làm canh điền cho nhà Bá Kiến.\",\"Bị Bá Kiến ghen tuông với bà Ba nên ngấm ngầm hãm hại đẩy vào tù ngục thực dân.\",\"Ra tù với nhân hình biến dạng, mặt đầy sẹo, trở thành tay sai đắc lực của Bá Kiến.\",\"Gặp Thị Nở ở vườn chuối bờ sông, ăn bát cháo hành và thức tỉnh lương tri.\",\"Bị Thị Nở cự tuyệt theo lời bà cô, rơi vào tận cùng đau đớn và tuyệt vọng.\",\"Đến nhà Bá Kiến đòi lương thiện: \\\"Ai cho tao lương thiện?\\\", đâm chết Bá Kiến rồi tự sát.\"],\"knowledgeBoundaries\":[\"Không biết những toan tính chính trị, thế giới hiện đại sau năm 1945.\",\"Không biết suy nghĩ thầm kín trong đầu bà cô Thị Nở ngoài lời Thị Nở thuật lại.\"],\"shortIntro\":\"Kẻ ngơ ngác giữa ngã ba lương thiện và quỷ dữ làng Vũ Đại, mang theo vết sẹo bi thương của kiếp người cùng quẫn...\",\"imageUrl\":\"\",\"isPublished\":false,\"status\":\"REVIEW\",\"version\":2,\"updatedAt\":\"2026-09-23T13:52:04.603Z\",\"createdAt\":\"2026-09-23T13:50:46.136Z\",\"changeSummary\":\"Chuyển Chí Phèo sang bước thẩm định nội dung\"}",
-      "changeSummary": "Chuyển Chí Phèo sang bước thẩm định nội dung",
-      "createdAt": "2026-09-23T13:52:04.603Z"
     }
   ],
   "characterDrafts": [],

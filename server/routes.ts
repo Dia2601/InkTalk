@@ -5,6 +5,7 @@ import {
   generateCharacterResponse,
   runAiTestSuite,
   extractCleanErrorMessage,
+  circuitBreaker,
 } from './gemini.js';
 import { runPrePublishSystemCheck } from './prepublish.js';
 import type { Character, Clue, MysteryRule } from '../src/types.js';
@@ -238,31 +239,39 @@ apiRouter.post('/admin/characters', checkAdminAuth, (req, res) => {
     shortIntro,
     imageUrl,
     isPublished,
+    status,
   } = req.body;
 
   if (!name || !workTitle) {
     return res.status(400).json({ error: 'Tên nhân vật và tác phẩm là bắt buộc.' });
   }
 
-  const newChar = db.createCharacter({
-    workId: workId || 'wrk_default',
-    workTitle,
-    workAuthor: workAuthor || '',
-    name,
-    role: role || 'Nhân vật chính',
-    badge: badge || 'main',
-    personality: personality || '',
-    voiceTone: voiceTone || '',
-    pronouns: pronouns || 'tôi',
-    perspective: perspective || '',
-    knownFacts: Array.isArray(knownFacts) ? knownFacts : [],
-    knowledgeBoundaries: Array.isArray(knowledgeBoundaries) ? knowledgeBoundaries : [],
-    shortIntro: shortIntro || '',
-    imageUrl: imageUrl || '', // Admin must supply, AI never supplies
-    isPublished: !!isPublished,
-  });
+  try {
+    const finalStatus = status || (isPublished ? 'PUBLISHED' : 'DRAFT');
+    const newChar = db.createCharacter({
+      workId: workId || 'wrk_default',
+      workTitle,
+      workAuthor: workAuthor || '',
+      name,
+      role: role || 'Nhân vật chính',
+      badge: badge || 'main',
+      personality: personality || '',
+      voiceTone: voiceTone || '',
+      pronouns: pronouns || 'tôi',
+      perspective: perspective || '',
+      knownFacts: Array.isArray(knownFacts) ? knownFacts : [],
+      knowledgeBoundaries: Array.isArray(knowledgeBoundaries) ? knowledgeBoundaries : [],
+      shortIntro: shortIntro || '',
+      imageUrl: imageUrl || '', // Admin must supply, AI never supplies
+      isPublished: Boolean(isPublished),
+      status: finalStatus,
+    });
 
-  res.json(newChar);
+    res.json(newChar);
+  } catch (err: any) {
+    console.error('[API /admin/characters] Failed to create character:', err);
+    res.status(500).json({ error: 'Không thể lưu nhân vật vào cơ sở dữ liệu: ' + err?.message });
+  }
 });
 
 apiRouter.put('/admin/characters/:id', checkAdminAuth, (req, res) => {
@@ -270,7 +279,7 @@ apiRouter.put('/admin/characters/:id', checkAdminAuth, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Không tìm thấy nhân vật.' });
 
   // Rule 9: If Admin attempts to publish without an image, block publish!
-  if (req.body.isPublished === true) {
+  if (req.body.isPublished === true || req.body.status === 'PUBLISHED') {
     const finalImage = req.body.imageUrl !== undefined ? req.body.imageUrl : existing.imageUrl;
     if (!finalImage || !finalImage.trim()) {
       return res.status(400).json({
@@ -279,8 +288,14 @@ apiRouter.put('/admin/characters/:id', checkAdminAuth, (req, res) => {
     }
   }
 
-  const updated = db.updateCharacter(req.params.id, req.body);
-  res.json(updated);
+  try {
+    const changeSummary = req.body.changeSummary || 'Chỉnh sửa thông tin nhân vật';
+    const updated = db.updateCharacter(req.params.id, req.body, changeSummary);
+    res.json(updated);
+  } catch (err: any) {
+    console.error('[API /admin/characters/:id] Failed to update character:', err);
+    res.status(500).json({ error: 'Không thể cập nhật nhân vật: ' + err?.message });
+  }
 });
 
 apiRouter.delete('/admin/characters/:id', checkAdminAuth, (req, res) => {
@@ -288,31 +303,111 @@ apiRouter.delete('/admin/characters/:id', checkAdminAuth, (req, res) => {
   res.json({ success });
 });
 
+// Character Image Upload -> Saves physical file on disk & updates character
 apiRouter.post('/admin/characters/:id/upload-image', checkAdminAuth, (req, res) => {
   const { imageDataUrl } = req.body;
   if (!imageDataUrl) {
     return res.status(400).json({ error: 'Không có dữ liệu ảnh.' });
   }
-  const updated = db.updateCharacter(req.params.id, { imageUrl: imageDataUrl });
-  if (!updated) return res.status(404).json({ error: 'Không tìm thấy nhân vật.' });
-  res.json({ success: true, character: updated });
+  try {
+    const publicUrl = db.saveUploadedImage(req.params.id, imageDataUrl);
+    const updated = db.getCharacterById(req.params.id);
+    res.json({ success: true, character: updated, imageUrl: publicUrl });
+  } catch (err: any) {
+    console.error('[API /admin/characters/:id/upload-image] Failed to save image:', err);
+    res.status(500).json({ error: err?.message || 'Lỗi lưu trữ ảnh nhân vật vào ổ đĩa.' });
+  }
+});
+
+// Character Versioning
+apiRouter.get('/admin/characters/:id/versions', checkAdminAuth, (req, res) => {
+  const versions = db.getCharacterVersions(req.params.id);
+  res.json(versions);
+});
+
+apiRouter.post('/admin/characters/:id/versions/:ver/revert', checkAdminAuth, (req, res) => {
+  const verNumber = parseInt(req.params.ver, 10);
+  if (isNaN(verNumber)) {
+    return res.status(400).json({ error: 'Số phiên bản không hợp lệ.' });
+  }
+  const reverted = db.revertCharacterVersion(req.params.id, verNumber);
+  if (!reverted) {
+    return res.status(404).json({ error: 'Không tìm thấy phiên bản để khôi phục.' });
+  }
+  res.json({ success: true, character: reverted });
+});
+
+// Auto-Save Drafts
+apiRouter.post('/admin/characters/draft', checkAdminAuth, (req, res) => {
+  const { characterId, formData } = req.body;
+  try {
+    const draft = db.saveCharacterDraft(characterId, formData);
+    res.json({ success: true, draft });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Không thể lưu bản nháp: ' + err?.message });
+  }
+});
+
+apiRouter.get('/admin/characters/draft', checkAdminAuth, (req, res) => {
+  const charId = req.query.characterId as string | undefined;
+  const draft = db.getCharacterDraft(charId);
+  res.json({ draft });
+});
+
+apiRouter.delete('/admin/characters/draft', checkAdminAuth, (req, res) => {
+  const charId = req.query.characterId as string | undefined;
+  db.deleteCharacterDraft(charId);
+  res.json({ success: true });
 });
 
 // ----------------------------------------------------
 // AI LITERARY RESEARCH ENGINE (ADMIN ONLY)
 // ----------------------------------------------------
+apiRouter.get('/admin/ai-research/latest', checkAdminAuth, (_req, res) => {
+  const latest = db.getLatestResearchRecord();
+  res.json({ record: latest });
+});
+
+apiRouter.get('/admin/ai-research/records', checkAdminAuth, (_req, res) => {
+  res.json(db.getResearchRecords());
+});
+
 apiRouter.post('/admin/ai-research', checkAdminAuth, async (req, res) => {
   const { workTitle, author, excerpt } = req.body;
   if (!workTitle) {
     return res.status(400).json({ error: 'Vui lòng nhập tên tác phẩm.' });
   }
 
+  // Record queued research job in persistent database
+  db.createOrUpdateResearchRecord(workTitle, author || '', excerpt, 'RUNNING');
+
   try {
     const research = await researchWorkWithAI(workTitle, author || '', excerpt);
+
+    // Save persistent research record in SQLite database
+    db.createOrUpdateResearchRecord(
+      workTitle,
+      author || '',
+      excerpt,
+      'SUCCESS',
+      research
+    );
+
     res.json(research);
   } catch (err: any) {
     const clean = extractCleanErrorMessage(err);
     console.error('[Route /admin/ai-research] Error occurred:', clean.technicalDetails);
+
+    // Update persistent research record with failure details
+    db.createOrUpdateResearchRecord(
+      workTitle,
+      author || '',
+      excerpt,
+      'FAILED',
+      undefined,
+      clean.technicalDetails
+    );
+
     res.status(clean.statusCode || 500).json({
       error: clean.userMessage,
       technicalDetails: clean.technicalDetails,
@@ -320,6 +415,33 @@ apiRouter.post('/admin/ai-research', checkAdminAuth, async (req, res) => {
       statusCode: clean.statusCode,
     });
   }
+});
+
+// ----------------------------------------------------
+// DATABASE AUDIT, EXPORT, BACKUP & RESTORE
+// ----------------------------------------------------
+apiRouter.get('/admin/database/integrity-check', checkAdminAuth, (_req, res) => {
+  const report = db.getDataIntegrityReport(circuitBreaker.getState());
+  res.json(report);
+});
+
+apiRouter.get('/admin/database/export', checkAdminAuth, (_req, res) => {
+  const dump = db.exportFullDatabase();
+  res.json(dump);
+});
+
+apiRouter.post('/admin/database/create-backup', checkAdminAuth, (_req, res) => {
+  const filename = db.createAutomaticBackup();
+  res.json({ success: Boolean(filename), filename });
+});
+
+apiRouter.post('/admin/database/restore', checkAdminAuth, (req, res) => {
+  const data = req.body;
+  if (!data || typeof data !== 'object') {
+    return res.status(400).json({ error: 'Dữ liệu sao lưu không hợp lệ.' });
+  }
+  const success = db.restoreFullDatabase(data);
+  res.json({ success });
 });
 
 // ----------------------------------------------------

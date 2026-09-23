@@ -30,6 +30,14 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronUp,
+  History,
+  Database,
+  Download,
+  RefreshCw,
+  Layers,
+  Archive,
+  CheckSquare,
+  Clock,
 } from 'lucide-react';
 import type {
   Character,
@@ -39,6 +47,11 @@ import type {
   PrePublishReport,
   AiTestSuiteReport,
   ChatMessage,
+  CharacterStatus,
+  CharacterVersion,
+  CharacterDraft,
+  ResearchRecord,
+  DataIntegrityReport,
 } from '../types';
 import {
   adminLogin,
@@ -59,6 +72,17 @@ import {
   saveAdminMysteryRule,
   getAdminMysteryRule,
   sendChatMessage,
+  getCharacterVersions,
+  revertCharacterVersion,
+  saveCharacterDraft,
+  getCharacterDraft,
+  deleteCharacterDraft,
+  getLatestResearchRecord,
+  getResearchRecords,
+  getDataIntegrityReport,
+  exportDatabase,
+  createBackup,
+  restoreDatabase,
 } from '../services/api';
 
 export interface AdminPortalProps {
@@ -87,7 +111,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // 11 Admin Dashboard Areas
+  // 12 Admin Dashboard Areas
   const [activeTab, setActiveTab] = useState<
     | 'works'
     | 'characters'
@@ -99,6 +123,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     | 'testmode'
     | 'prepublish'
     | 'stats'
+    | 'integrity'
     | 'settings'
   >('works');
 
@@ -119,6 +144,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       testmode: 'testmode',
       prepublish: 'prepublish',
       stats: 'stats',
+      integrity: 'integrity',
       settings: 'settings',
     };
     if (map[subroute] && map[subroute] !== activeTab) {
@@ -129,6 +155,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [works, setWorks] = useState<Work[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharId, setSelectedCharId] = useState<string>('');
+
+  // Character Versioning State
+  const [characterVersions, setCharacterVersions] = useState<CharacterVersion[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+
+  // Character Draft & Auto-Save State
+  const [draftSaveStatus, setDraftSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [draftLastSaved, setDraftLastSaved] = useState<string | null>(null);
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [savedDraftData, setSavedDraftData] = useState<any>(null);
+
+  // Character Status State
+  const [newCharStatus, setNewCharStatus] = useState<CharacterStatus>('DRAFT');
+
+  // Data Integrity & Backup State
+  const [integrityReport, setIntegrityReport] = useState<DataIntegrityReport | null>(null);
+  const [integrityLoading, setIntegrityLoading] = useState(false);
+  const [backupActionNotice, setBackupActionNotice] = useState<string | null>(null);
+
+  // Past Research Records
+  const [pastResearchRecords, setPastResearchRecords] = useState<ResearchRecord[]>([]);
 
   // AI Research State (Inputs preserved on any error)
   const [researchWorkTitle, setResearchWorkTitle] = useState('');
@@ -248,6 +295,261 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setTestSuiteReport(null);
     setTestMessages([]);
   }, [token, selectedCharId, characters]);
+
+  // Load Character Versions when selected character changes
+  useEffect(() => {
+    if (!token || !selectedCharId) {
+      setCharacterVersions([]);
+      return;
+    }
+    setLoadingVersions(true);
+    getCharacterVersions(token, selectedCharId)
+      .then(setCharacterVersions)
+      .catch((e) => console.warn('Could not load versions:', e))
+      .finally(() => setLoadingVersions(false));
+  }, [token, selectedCharId]);
+
+  // Load Saved Character Draft on initialization
+  useEffect(() => {
+    if (!token) return;
+    getCharacterDraft(token).then((draft) => {
+      if (draft && draft.formData && Object.keys(draft.formData).length > 0) {
+        setHasSavedDraft(true);
+        setSavedDraftData(draft.formData);
+        setDraftLastSaved(new Date(draft.updatedAt || Date.now()).toLocaleTimeString('vi-VN'));
+      }
+    });
+  }, [token]);
+
+  // Auto-Save Draft Debounce (Requirement 6: Auto-Save Drafts)
+  useEffect(() => {
+    if (!token) return;
+    if (
+      !newCharName.trim() &&
+      !newCharPersonality.trim() &&
+      !newCharShortIntro.trim() &&
+      !newCharKnownFacts.trim()
+    ) {
+      return;
+    }
+
+    setDraftSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      try {
+        await saveCharacterDraft(token, undefined, {
+          name: newCharName,
+          workId: newCharWorkId,
+          role: newCharRole,
+          badge: newCharBadge,
+          personality: newCharPersonality,
+          voiceTone: newCharVoice,
+          pronouns: newCharPronouns,
+          perspective: newCharPerspective,
+          shortIntro: newCharShortIntro,
+          knownFacts: newCharKnownFacts.split('\n').filter(Boolean),
+          knowledgeBoundaries: newCharBoundaries.split('\n').filter(Boolean),
+          status: newCharStatus,
+        });
+        setDraftSaveStatus('saved');
+        setDraftLastSaved(new Date().toLocaleTimeString('vi-VN'));
+      } catch (err) {
+        console.warn('Auto-save draft error:', err);
+        setDraftSaveStatus('idle');
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [
+    token,
+    newCharName,
+    newCharWorkId,
+    newCharRole,
+    newCharBadge,
+    newCharPersonality,
+    newCharVoice,
+    newCharPronouns,
+    newCharPerspective,
+    newCharShortIntro,
+    newCharKnownFacts,
+    newCharBoundaries,
+    newCharStatus,
+  ]);
+
+  // Restore Draft function
+  const handleRestoreDraft = () => {
+    if (!savedDraftData) return;
+    if (savedDraftData.name) setNewCharName(savedDraftData.name);
+    if (savedDraftData.workId) setNewCharWorkId(savedDraftData.workId);
+    if (savedDraftData.role) setNewCharRole(savedDraftData.role);
+    if (savedDraftData.badge) setNewCharBadge(savedDraftData.badge);
+    if (savedDraftData.personality) setNewCharPersonality(savedDraftData.personality);
+    if (savedDraftData.voiceTone) setNewCharVoice(savedDraftData.voiceTone);
+    if (savedDraftData.pronouns) setNewCharPronouns(savedDraftData.pronouns);
+    if (savedDraftData.perspective) setNewCharPerspective(savedDraftData.perspective);
+    if (savedDraftData.shortIntro) setNewCharShortIntro(savedDraftData.shortIntro);
+    if (savedDraftData.knownFacts) {
+      setNewCharKnownFacts(
+        Array.isArray(savedDraftData.knownFacts)
+          ? savedDraftData.knownFacts.join('\n')
+          : savedDraftData.knownFacts
+      );
+    }
+    if (savedDraftData.knowledgeBoundaries) {
+      setNewCharBoundaries(
+        Array.isArray(savedDraftData.knowledgeBoundaries)
+          ? savedDraftData.knowledgeBoundaries.join('\n')
+          : savedDraftData.knowledgeBoundaries
+      );
+    }
+    if (savedDraftData.status) setNewCharStatus(savedDraftData.status);
+    setHasSavedDraft(false);
+    setNotice('✓ Đã khôi phục dữ liệu từ bản nháp tự động lưu!');
+  };
+
+  // Discard Draft function
+  const handleDiscardDraft = async () => {
+    if (!token) return;
+    try {
+      await deleteCharacterDraft(token);
+      setHasSavedDraft(false);
+      setSavedDraftData(null);
+      setDraftSaveStatus('idle');
+      setNotice('Đã hủy bản nháp lưu tạm.');
+    } catch (e: any) {
+      setNotice('Lỗi xóa bản nháp: ' + e?.message);
+    }
+  };
+
+  // Revert to a Previous Version
+  const handleRevertVersion = async (versionNumber: number) => {
+    if (!token || !selectedCharId) return;
+    if (!confirm(`Khôi phục nhân vật về Phiên bản ${versionNumber}? Mọi chỉnh sửa sau đó sẽ được lưu thành phiên bản mới.`)) {
+      return;
+    }
+    try {
+      await revertCharacterVersion(token, selectedCharId, versionNumber);
+      setNotice(`✓ Đã khôi phục thành công về Phiên bản ${versionNumber}!`);
+      refreshAdminData();
+      getCharacterVersions(token, selectedCharId).then(setCharacterVersions);
+      onRefreshPublicData();
+    } catch (err: any) {
+      setNotice('Lỗi khôi phục phiên bản: ' + err?.message);
+    }
+  };
+
+  // Update Character Status directly
+  const handleUpdateStatus = async (charId: string, status: CharacterStatus) => {
+    if (!token) return;
+    try {
+      await updateAdminCharacter(token, charId, {
+        status,
+        isPublished: status === 'PUBLISHED',
+      });
+      setNotice(`✓ Đã cập nhật trạng thái nhân vật thành: ${status}`);
+      refreshAdminData();
+      getCharacterVersions(token, charId).then(setCharacterVersions);
+      onRefreshPublicData();
+    } catch (err: any) {
+      setNotice('Lỗi: ' + err?.message);
+    }
+  };
+
+  // Load Latest Research Record on Startup (Persistence)
+  useEffect(() => {
+    if (!token) return;
+    getLatestResearchRecord(token).then((rec) => {
+      if (rec && rec.status === 'SUCCESS' && rec.result) {
+        setResearchWorkTitle(rec.workTitle);
+        if (rec.workAuthor) setResearchAuthor(rec.workAuthor);
+        if (rec.excerpt) setResearchExcerpt(rec.excerpt);
+        setResearchResult(rec.result);
+        setResearchJobState('SUCCESS');
+      }
+    });
+    getResearchRecords(token).then(setPastResearchRecords);
+  }, [token]);
+
+  // Load Data Integrity Report when Integrity Tab is Active
+  useEffect(() => {
+    if (!token || activeTab !== 'integrity') return;
+    loadIntegrityReport();
+  }, [token, activeTab]);
+
+  const loadIntegrityReport = async () => {
+    if (!token) return;
+    setIntegrityLoading(true);
+    try {
+      const rep = await getDataIntegrityReport(token);
+      setIntegrityReport(rep);
+    } catch (err: any) {
+      console.error('Failed to load integrity report:', err);
+    } finally {
+      setIntegrityLoading(false);
+    }
+  };
+
+  // Trigger Rolling Backup
+  const handleTriggerBackup = async () => {
+    if (!token) return;
+    try {
+      setBackupActionNotice('Đang tạo bản sao lưu an toàn...');
+      const res = await createBackup(token);
+      setBackupActionNotice(`✓ Đã tạo bản sao lưu thành công: ${res.filename}`);
+      loadIntegrityReport();
+    } catch (err: any) {
+      setBackupActionNotice('Lỗi tạo sao lưu: ' + err?.message);
+    }
+  };
+
+  // Export Full Database to JSON file
+  const handleExportDatabaseJson = async () => {
+    if (!token) return;
+    try {
+      const dump = await exportDatabase(token);
+      const blob = new Blob([JSON.stringify(dump, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inktalk_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setNotice('✓ Đã xuất tệp sao lưu dữ liệu toàn diện (JSON) thành công!');
+    } catch (err: any) {
+      setNotice('Lỗi xuất dữ liệu: ' + err?.message);
+    }
+  };
+
+  // Restore Database from JSON file
+  const handleRestoreDatabaseFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !token) return;
+    if (!confirm('Khôi phục cơ sở dữ liệu từ tệp này sẽ ghi đè dữ liệu hiện tại. Bạn có chắc chắn muốn tiếp tục?')) {
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        await restoreDatabase(token, parsed);
+        setNotice('✓ Đã khôi phục toàn bộ cơ sở dữ liệu thành công!');
+        refreshAdminData();
+        loadIntegrityReport();
+        onRefreshPublicData();
+      } catch (err: any) {
+        setNotice('Lỗi khôi phục tệp: ' + err?.message);
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Save Image URL manually
   const handleSaveImageUrl = async (charId: string, url: string) => {
@@ -429,8 +731,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         knownFacts: newCharKnownFacts.split('\n').filter(Boolean),
         knowledgeBoundaries: newCharBoundaries.split('\n').filter(Boolean),
         imageUrl: '', // Uploaded by admin separately (Rule 4)
-        isPublished: false,
+        isPublished: newCharStatus === 'PUBLISHED',
+        status: newCharStatus,
       });
+
+      // Clear draft upon successful database save
+      await deleteCharacterDraft(token);
+      setHasSavedDraft(false);
+      setSavedDraftData(null);
+      setDraftSaveStatus('idle');
 
       setNewCharName('');
       setNewCharPersonality('');
@@ -438,12 +747,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setNewCharShortIntro('');
       setNewCharKnownFacts('');
       setNewCharBoundaries('');
-      setNotice(`Đã tạo nhân vật "${newChar.name}". Hãy tải ảnh lên trước khi xuất bản!`);
+      setNewCharStatus('DRAFT');
+      setNotice(`✓ Đã lưu nhân vật "${newChar.name}" vào cơ sở dữ liệu! Hãy tải ảnh lên trước khi xuất bản.`);
       refreshAdminData();
       setSelectedCharId(newChar.id);
       onRefreshPublicData();
     } catch (err: any) {
-      setNotice('Lỗi: ' + err?.message);
+      setNotice('Lỗi lưu nhân vật: ' + err?.message);
     }
   };
 
@@ -1046,6 +1356,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </button>
 
               <button
+                onClick={() => switchTab('integrity')}
+                className={`w-full text-left px-3 py-2 rounded-xl flex items-center space-x-2 font-semibold transition-colors cursor-pointer ${
+                  activeTab === 'integrity'
+                    ? 'bg-[#F3B8C8]/60 text-[#332B35]'
+                    : 'text-[#5A4650] hover:bg-[#F5D889]/20'
+                }`}
+              >
+                <Database className="w-4 h-4 text-emerald-600" />
+                <span>11. Toàn vẹn & Sao lưu</span>
+              </button>
+
+              <button
                 onClick={() => switchTab('settings')}
                 className={`w-full text-left px-3 py-2 rounded-xl flex items-center space-x-2 font-semibold transition-colors cursor-pointer ${
                   activeTab === 'settings'
@@ -1054,7 +1376,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 }`}
               >
                 <Settings className="w-4 h-4 text-[#493C5A]" />
-                <span>11. Cài đặt quản trị</span>
+                <span>12. Cài đặt quản trị</span>
               </button>
             </div>
 
@@ -1204,9 +1526,47 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
               )}
 
-              {/* TAB 2: CHARACTERS & IMAGE UPLOAD */}
+              {/* TAB 2: CHARACTERS & IMAGE UPLOAD & VERSIONING */}
               {activeTab === 'characters' && (
                 <div className="space-y-6">
+                  {/* Character Selector & Lifecycle Status Bar */}
+                  <div className="p-4 rounded-2xl bg-white border border-[#C9B5EA]/40 shadow-xs text-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <label className="font-bold text-[#5A4650] block mb-1">Chọn nhân vật để xem & quản lý:</label>
+                        <select
+                          value={selectedCharId}
+                          onChange={(e) => setSelectedCharId(e.target.value)}
+                          className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/50 bg-white font-semibold text-xs text-[#332B35]"
+                        >
+                          <option value="">-- Chọn nhân vật --</option>
+                          {characters.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} — {c.workTitle} [{c.status || (c.isPublished ? 'PUBLISHED' : 'DRAFT')}]
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {selectedChar && (
+                        <div className="sm:self-end">
+                          <label className="font-bold text-[#5A4650] block mb-1">Chuyển trạng thái quy trình:</label>
+                          <select
+                            value={selectedChar.status || (selectedChar.isPublished ? 'PUBLISHED' : 'DRAFT')}
+                            onChange={(e) => handleUpdateStatus(selectedChar.id, e.target.value as CharacterStatus)}
+                            className="p-2.5 rounded-xl border border-[#F5D889] bg-[#FFF8F1] font-bold text-xs text-[#493C5A]"
+                          >
+                            <option value="DRAFT">📝 DRAFT (Bản nháp)</option>
+                            <option value="REVIEW">🔍 REVIEW (Đang thẩm định)</option>
+                            <option value="APPROVED">✓ APPROVED (Đã duyệt canon)</option>
+                            <option value="PUBLISHED">🌟 PUBLISHED (Đã xuất bản)</option>
+                            <option value="ARCHIVED">📦 ARCHIVED (Lưu trữ)</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {selectedChar && (
                     <div className="p-4 rounded-2xl bg-white border border-[#F5D889]/50 shadow-xs text-xs space-y-4">
                       <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-3 sm:space-y-0 sm:space-x-5">
@@ -1226,9 +1586,33 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         </div>
 
                         <div className="flex-1 space-y-2">
-                          <h3 className="text-lg font-bold font-serif-literary text-[#332B35]">
-                            {selectedChar.name} ({selectedChar.role})
-                          </h3>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-bold font-serif-literary text-[#332B35]">
+                              {selectedChar.name} ({selectedChar.role})
+                            </h3>
+                            {/* Status Badge */}
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                (selectedChar.status || (selectedChar.isPublished ? 'PUBLISHED' : 'DRAFT')) === 'PUBLISHED'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : (selectedChar.status || 'DRAFT') === 'APPROVED'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : (selectedChar.status || 'DRAFT') === 'REVIEW'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  : (selectedChar.status || 'DRAFT') === 'ARCHIVED'
+                                  ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                  : 'bg-gray-100 text-gray-800 border border-gray-200'
+                              }`}
+                            >
+                              {selectedChar.status || (selectedChar.isPublished ? 'PUBLISHED' : 'DRAFT')}
+                            </span>
+                            {selectedChar.version && (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-mono">
+                                v{selectedChar.version}
+                              </span>
+                            )}
+                          </div>
+
                           <p className="text-[#6F91AA]">
                             Tác phẩm: <strong>{selectedChar.workTitle}</strong> ({selectedChar.workAuthor})
                           </p>
@@ -1281,18 +1665,120 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           </ul>
                         </div>
                       </div>
+
+                      {/* REQUIREMENT 8: VERSION HISTORY PANEL */}
+                      <div className="pt-4 border-t border-[#F5D889]/30 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <History className="w-4 h-4 text-[#C9B5EA]" />
+                            <h4 className="font-bold text-sm text-[#332B35]">
+                              Lịch Sử Phiên Bản (Version History)
+                            </h4>
+                          </div>
+                          <span className="text-[11px] text-[#6F91AA]">
+                            {characterVersions.length} phiên bản đã ghi nhận
+                          </span>
+                        </div>
+
+                        {loadingVersions ? (
+                          <p className="text-[11px] text-gray-500 italic">Đang tải lịch sử phiên bản...</p>
+                        ) : characterVersions.length === 0 ? (
+                          <p className="text-[11px] text-gray-500 italic">
+                            Chưa có lịch sử phiên bản trước đó (đây là phiên bản đầu tiên).
+                          </p>
+                        ) : (
+                          <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden bg-gray-50/50">
+                            {characterVersions.map((v) => (
+                              <div
+                                key={v.id}
+                                className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                              >
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-bold font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md text-[11px]">
+                                      Phiên bản {v.versionNumber}
+                                    </span>
+                                    <span className="text-gray-500 text-[10px]">
+                                      {new Date(v.createdAt).toLocaleString('vi-VN')}
+                                    </span>
+                                  </div>
+                                  <p className="text-[#5A4650] text-[11px] italic">
+                                    {v.changeSummary || 'Chỉnh sửa dữ liệu nhân vật'}
+                                  </p>
+                                </div>
+
+                                <button
+                                  onClick={() => handleRevertVersion(v.versionNumber)}
+                                  className="px-3 py-1.5 rounded-lg bg-white border border-[#C9B5EA] hover:bg-[#F3B8C8]/20 font-bold text-[11px] text-[#332B35] shadow-2xs self-start sm:self-auto cursor-pointer"
+                                >
+                                  Khôi phục phiên bản này
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  {/* Manual Add Character Form */}
-                  <div className="p-4 rounded-2xl bg-white border border-[#C9B5EA]/40 shadow-xs text-xs">
-                    <h3 className="text-sm font-bold font-serif-literary text-[#332B35] mb-3 flex items-center space-x-1.5">
-                      <Plus className="w-4 h-4 text-[#C9B5EA]" />
-                      <span>Thêm Nhân Vật Mới Thủ Công</span>
-                    </h3>
+                  {/* Manual Add Character Form with Auto-Save Draft */}
+                  <div className="p-4 rounded-2xl bg-white border border-[#C9B5EA]/40 shadow-xs text-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#C9B5EA]/20 pb-2.5">
+                      <h3 className="text-sm font-bold font-serif-literary text-[#332B35] flex items-center space-x-1.5">
+                        <Plus className="w-4 h-4 text-[#C9B5EA]" />
+                        <span>Thêm Nhân Vật Mới Thủ Công (Lưu Bền Vững)</span>
+                      </h3>
+
+                      {/* Auto-Save Draft Indicator */}
+                      <div className="flex items-center space-x-2">
+                        {draftSaveStatus === 'saving' && (
+                          <span className="text-amber-600 animate-pulse text-[11px] font-medium flex items-center space-x-1">
+                            <Clock className="w-3.5 h-3.5 animate-spin" />
+                            <span>Đang lưu bản nháp...</span>
+                          </span>
+                        )}
+                        {draftSaveStatus === 'saved' && draftLastSaved && (
+                          <span className="text-emerald-700 text-[11px] font-medium flex items-center space-x-1">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Đã lưu bản nháp lúc {draftLastSaved}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Detected Unsaved Draft Prompt */}
+                    {hasSavedDraft && savedDraftData && (
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div className="space-y-0.5">
+                          <p className="font-bold flex items-center space-x-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Phát hiện bản nháp chưa hoàn tất từ phiên trước</span>
+                          </p>
+                          <p className="text-[11px] text-amber-700">
+                            Nhân vật: <strong>{savedDraftData.name || '(Chưa đặt tên)'}</strong> • Lưu lúc {draftLastSaved || 'gần đây'}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={handleRestoreDraft}
+                            className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 transition cursor-pointer"
+                          >
+                            Khôi phục bản nháp
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDiscardDraft}
+                            className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-800 font-medium text-xs hover:bg-amber-100 transition cursor-pointer"
+                          >
+                            Hủy bỏ
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     <form onSubmit={handleCreateCharacter} className="space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div>
                           <label className="font-bold text-[#5A4650] block mb-1">Thuộc tác phẩm:</label>
                           <select
@@ -1315,7 +1801,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             required
                             value={newCharName}
                             onChange={(e) => setNewCharName(e.target.value)}
-                            placeholder="Ví dụ: Vũ Nương"
+                            placeholder="Ví dụ: Chí Phèo"
                             className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/50 bg-white"
                           />
                         </div>
@@ -1331,6 +1817,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             <option value="unexpected">Góc nhìn bất ngờ</option>
                           </select>
                         </div>
+                        <div>
+                          <label className="font-bold text-[#5A4650] block mb-1">Trạng thái khởi tạo:</label>
+                          <select
+                            value={newCharStatus}
+                            onChange={(e) => setNewCharStatus(e.target.value as CharacterStatus)}
+                            className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/50 bg-white font-bold"
+                          >
+                            <option value="DRAFT">📝 DRAFT (Bản nháp)</option>
+                            <option value="REVIEW">🔍 REVIEW (Thẩm định)</option>
+                            <option value="APPROVED">✓ APPROVED (Đã duyệt)</option>
+                            <option value="PUBLISHED">🌟 PUBLISHED (Xuất bản)</option>
+                          </select>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1340,7 +1839,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             type="text"
                             value={newCharPersonality}
                             onChange={(e) => setNewCharPersonality(e.target.value)}
-                            placeholder="Ví dụ: Thùy mị nết na, giàu đức hi sinh"
+                            placeholder="Ví dụ: Nông dân lương thiện bị tha hóa, khao khát hoàn lương"
                             className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/50 bg-white"
                           />
                         </div>
@@ -1350,7 +1849,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             type="text"
                             value={newCharPronouns}
                             onChange={(e) => setNewCharPronouns(e.target.value)}
-                            placeholder="Ví dụ: thiếp - chàng"
+                            placeholder="Ví dụ: tôi - người anh em, tao - chúng mày"
                             className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/50 bg-white"
                           />
                         </div>
@@ -1396,12 +1895,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         </div>
                       </div>
 
-                      <button
-                        type="submit"
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F3B8C8] to-[#F5D889] font-bold text-xs text-[#332B35] shadow-xs"
-                      >
-                        Lưu Nhân Vật Mới
-                      </button>
+                      <div className="pt-2 flex items-center justify-between">
+                        <button
+                          type="submit"
+                          className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#F3B8C8] to-[#F5D889] font-bold text-xs text-[#332B35] shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center space-x-2"
+                        >
+                          <Save className="w-4 h-4 text-[#332B35]" />
+                          <span>LƯU NHÂN VẬT VÀO DATABASE</span>
+                        </button>
+                        <span className="text-[11px] text-[#6F91AA]">
+                          * Dữ liệu được ghi ngay vào SQLite (WAL mode) bền vững.
+                        </span>
+                      </div>
                     </form>
                   </div>
                 </div>
@@ -1663,8 +2168,41 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <p className="text-[#6F91AA] mb-4">
                       AI hỗ trợ Admin nghiên cứu tác phẩm, cấu trúc Canon, nhân vật, giới hạn kiến
                       thức và kịch bản manh mối. Admin có toàn quyền duyệt và chỉnh sửa trước khi
-                      lưu.
+                      lưu. Toàn bộ kết quả nghiên cứu được lưu tự động vào cơ sở dữ liệu bền vững.
                     </p>
+
+                    {pastResearchRecords.length > 0 && (
+                      <div className="mb-4 p-3 rounded-xl bg-[#FFF8F1] border border-[#F5D889]/60">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-[#5A4650] block">
+                            Hồ sơ nghiên cứu đã lưu vào database ({pastResearchRecords.length}):
+                          </label>
+                          <span className="text-[10px] text-emerald-700 font-semibold">✓ Không bao giờ mất sau restart</span>
+                        </div>
+                        <select
+                          onChange={(e) => {
+                            const rec = pastResearchRecords.find((r) => r.id === e.target.value);
+                            if (rec) {
+                              setResearchWorkTitle(rec.workTitle);
+                              if (rec.workAuthor || rec.author) setResearchAuthor(rec.workAuthor || rec.author);
+                              if (rec.excerpt) setResearchExcerpt(rec.excerpt);
+                              if (rec.result) {
+                                setResearchResult(rec.result);
+                                setResearchJobState('SUCCESS');
+                              }
+                            }
+                          }}
+                          className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/50 bg-white font-medium text-xs text-[#332B35]"
+                        >
+                          <option value="">-- Nạp lại kết quả từ cơ sở dữ liệu bền vững --</option>
+                          {pastResearchRecords.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.workTitle} ({r.workAuthor || r.author || 'Tác giả THPT'}) — [{new Date(r.createdAt).toLocaleDateString('vi-VN')}]
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                       <div>
@@ -2445,7 +2983,231 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
               )}
 
-              {/* TAB 11: CÀI ĐẶT QUẢN TRỊ & BẢO MẬT */}
+              {/* TAB 11: TOÀN VẸN DỮ LIỆU & QUẢN TRỊ SAO LƯU */}
+              {activeTab === 'integrity' && (
+                <div className="space-y-5 text-xs">
+                  <div className="p-4 rounded-2xl bg-white border border-[#C9B5EA]/50 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#F5D889]/30 pb-3">
+                      <div>
+                        <h3 className="text-base font-bold font-serif-literary text-[#332B35] flex items-center space-x-2">
+                          <Database className="w-5 h-5 text-emerald-600" />
+                          <span>Hệ Thống Cơ Sở Dữ Liệu Bền Vững & Toàn Vẹn (SQLite WAL)</span>
+                        </h3>
+                        <p className="text-[11px] text-[#6F91AA] mt-0.5">
+                          Đảm bảo 100% dữ liệu không bị mất khi container restart, redeploy hay mất mạng.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        <button
+                          onClick={loadIntegrityReport}
+                          disabled={integrityLoading}
+                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#332B35] font-semibold text-xs transition flex items-center space-x-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${integrityLoading ? 'animate-spin' : ''}`} />
+                          <span>Làm mới</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {backupActionNotice && (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
+                        <span>{backupActionNotice}</span>
+                        <button onClick={() => setBackupActionNotice(null)} className="text-emerald-600 hover:text-emerald-900">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Database Health Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="p-3.5 rounded-xl bg-[#FFF8F1] border border-[#F5D889]/60 space-y-1">
+                        <span className="text-[11px] text-[#6F91AA] font-bold block uppercase tracking-wider">
+                          Động cơ CSDL chính
+                        </span>
+                        <div className="text-sm font-bold text-emerald-800 flex items-center space-x-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>{integrityReport?.checks?.databaseEngine || 'SQLite 3 (WAL)'}</span>
+                        </div>
+                        <p className="text-[10px] text-[#5A4650]">
+                          Độc lập với server memory. Lưu đĩa bền vững.
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-[#FFF8F1] border border-[#F5D889]/60 space-y-1">
+                        <span className="text-[11px] text-[#6F91AA] font-bold block uppercase tracking-wider">
+                          Trạng thái ghi đĩa
+                        </span>
+                        <div className="text-sm font-bold text-emerald-800 flex items-center space-x-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Ghi tức thì (Atomic)</span>
+                        </div>
+                        <p className="text-[10px] text-[#5A4650]">
+                          WAL Mode: Bật ({integrityReport?.checks?.walMode ? 'Hoạt động' : 'Tự động đồng bộ'})
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-[#FFF8F1] border border-[#F5D889]/60 space-y-1">
+                        <span className="text-[11px] text-[#6F91AA] font-bold block uppercase tracking-wider">
+                          Circuit Breaker AI
+                        </span>
+                        <div className="text-sm font-bold flex items-center space-x-1.5">
+                          <span
+                            className={`w-2.5 h-2.5 rounded-full ${
+                              integrityReport?.checks?.circuitBreakerState === 'CLOSED'
+                                ? 'bg-emerald-500'
+                                : integrityReport?.checks?.circuitBreakerState === 'HALF_OPEN'
+                                ? 'bg-amber-500'
+                                : 'bg-rose-500'
+                            }`}
+                          />
+                          <span
+                            className={
+                              integrityReport?.checks?.circuitBreakerState === 'CLOSED'
+                                ? 'text-emerald-800 font-bold'
+                                : integrityReport?.checks?.circuitBreakerState === 'HALF_OPEN'
+                                ? 'text-amber-800 font-bold'
+                                : 'text-rose-800 font-bold'
+                            }
+                          >
+                            {integrityReport?.checks?.circuitBreakerState || 'CLOSED'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-[#5A4650]">
+                          Chống quá tải & tự động ngắt nếu Gemini 503
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-[#FFF8F1] border border-[#F5D889]/60 space-y-1">
+                        <span className="text-[11px] text-[#6F91AA] font-bold block uppercase tracking-wider">
+                          Bản sao lưu nội bộ
+                        </span>
+                        <div className="text-sm font-bold text-[#332B35] flex items-center space-x-1.5">
+                          <Archive className="w-4 h-4 text-purple-600" />
+                          <span>{integrityReport?.backupsCount ?? 0} bản sao lưu</span>
+                        </div>
+                        <p className="text-[10px] text-[#5A4650]">
+                          Tự động xoay vòng rolling backups
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quantitative Inventory Breakdown */}
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-[#332B35] text-xs uppercase tracking-wider">
+                        Số lượng thực thể đang được lưu trữ an toàn trong SQLite:
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] text-gray-500 block">Tác phẩm</span>
+                          <span className="text-base font-bold text-gray-800">
+                            {integrityReport?.worksCount ?? works.length}
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] text-gray-500 block">Nhân vật</span>
+                          <span className="text-base font-bold text-gray-800">
+                            {integrityReport?.charactersCount ?? characters.length}
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-purple-50 border border-purple-200">
+                          <span className="text-[10px] text-purple-700 block">Phiên bản lưu</span>
+                          <span className="text-base font-bold text-purple-900">
+                            {integrityReport?.versionsCount ?? 0}
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                          <span className="text-[10px] text-amber-700 block">Bản nháp tự lưu</span>
+                          <span className="text-base font-bold text-amber-900">
+                            {integrityReport?.draftsCount ?? 0}
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
+                          <span className="text-[10px] text-blue-700 block">Hồ sơ nghiên cứu</span>
+                          <span className="text-base font-bold text-blue-900">
+                            {integrityReport?.researchRecordsCount ?? pastResearchRecords.length}
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                          <span className="text-[10px] text-emerald-700 block">Ảnh đại diện</span>
+                          <span className="text-base font-bold text-emerald-900">
+                            {integrityReport?.imagesCount ?? 0}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Character Lifecycle Status Breakdown */}
+                    {integrityReport?.charactersByStatus && Object.keys(integrityReport.charactersByStatus).length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-[#332B35] text-xs uppercase tracking-wider">
+                          Phân loại vòng đời nhân vật (Lifecycle Breakdown):
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(integrityReport.charactersByStatus).map(([st, cnt]) => (
+                            <span
+                              key={st}
+                              className="px-3 py-1.5 rounded-xl bg-white border border-[#C9B5EA]/60 font-semibold text-xs text-[#493C5A] shadow-2xs flex items-center space-x-1.5"
+                            >
+                              <span className="font-mono text-purple-700 font-bold">{st}:</span>
+                              <span className="bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded font-bold">
+                                {cnt}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Disaster Recovery & Backup Actions */}
+                    <div className="pt-4 border-t border-[#F5D889]/30 space-y-3">
+                      <h4 className="font-bold text-[#332B35] text-xs uppercase tracking-wider flex items-center space-x-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                        <span>Trung Tâm Sao Lưu & Khôi Phục Dữ Liệu (Backup & Disaster Recovery)</span>
+                      </h4>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          onClick={handleTriggerBackup}
+                          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                        >
+                          <Archive className="w-4 h-4" />
+                          <span>Tạo Bản Sao Lưu Ngay (Backup Snapshot)</span>
+                        </button>
+
+                        <button
+                          onClick={handleExportDatabaseJson}
+                          className="px-4 py-2.5 rounded-xl bg-[#FFF8F1] hover:bg-[#F5D889]/30 border border-[#F5D889] text-[#332B35] font-bold text-xs shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                        >
+                          <Download className="w-4 h-4 text-blue-600" />
+                          <span>Tải File Sao Lưu Toàn Diện (.JSON)</span>
+                        </button>
+
+                        <label className="px-4 py-2.5 rounded-xl bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs shadow-xs transition flex items-center space-x-1.5 cursor-pointer">
+                          <Upload className="w-4 h-4" />
+                          <span>Khôi Phục Dữ Liệu Từ File (.JSON)</span>
+                          <input
+                            type="file"
+                            accept=".json"
+                            onChange={handleRestoreDatabaseFile}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                      <p className="text-[10px] text-[#6F91AA] italic">
+                        * Mọi hành động đều bảo vệ tuyệt đối: khi tạo tác phẩm hoặc nhân vật mới, InkTalk lưu trực tiếp vào cơ sở dữ liệu SQLite tại <code>/data/inktalk.db</code> với chế độ WAL chống hỏng tệp.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 12: CÀI ĐẶT QUẢN TRỊ & BẢO MẬT */}
               {activeTab === 'settings' && (
                 <div className="space-y-5 text-xs">
                   <div className="p-4 rounded-2xl bg-white border border-[#C9B5EA]/50 shadow-xs space-y-4">

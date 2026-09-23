@@ -78,6 +78,54 @@ export interface LiteraryResearchResult {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+export class GeminiCircuitBreaker {
+  private failureCount = 0;
+  private lastFailureTime = 0;
+  private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+  private readonly threshold = 3;
+  private readonly cooldownMs = 30000; // 30 seconds
+
+  public canExecute(): boolean {
+    const now = Date.now();
+    if (this.state === 'OPEN') {
+      if (now - this.lastFailureTime > this.cooldownMs) {
+        this.state = 'HALF_OPEN';
+        return true;
+      }
+      return false;
+    }
+    return true;
+  }
+
+  public recordSuccess() {
+    this.failureCount = 0;
+    this.state = 'CLOSED';
+  }
+
+  public recordFailure() {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    if (this.failureCount >= this.threshold) {
+      this.state = 'OPEN';
+    }
+  }
+
+  public getState(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
+    if (this.state === 'OPEN' && Date.now() - this.lastFailureTime > this.cooldownMs) {
+      return 'HALF_OPEN';
+    }
+    return this.state;
+  }
+
+  public reset() {
+    this.failureCount = 0;
+    this.lastFailureTime = 0;
+    this.state = 'CLOSED';
+  }
+}
+
+export const circuitBreaker = new GeminiCircuitBreaker();
+
 export function isRetryableAiError(error: any): boolean {
   if (!error) return false;
   const status = error.status || error.statusCode || error.code;
@@ -196,6 +244,17 @@ export async function researchWorkWithAI(
   author: string,
   contextOrExcerpt?: string
 ): Promise<LiteraryResearchResult> {
+  if (!circuitBreaker.canExecute()) {
+    const error: any = new Error(
+      'AI Research Engine đang tạm thời bảo vệ hệ thống trước tình trạng quá tải. Dữ liệu của bạn hoàn toàn an toàn. Vui lòng thử lại sau giây lát.'
+    );
+    error.status = 503;
+    error.statusCode = 503;
+    error.isRetryable = true;
+    error.technicalDetails = 'Circuit Breaker: OPEN (Đang trong thời gian bảo vệ chống quá tải 30s)';
+    throw error;
+  }
+
   const ai = getGenAI();
   if (!ai) {
     const error: any = new Error('Chưa cấu hình GEMINI_API_KEY trên máy chủ.');
@@ -262,6 +321,7 @@ Yêu cầu dữ liệu trả về theo đúng định dạng JSON:
       const text = response.text || '{}';
       try {
         const parsed = JSON.parse(text);
+        circuitBreaker.recordSuccess();
         console.log(`[AI Research Engine] Successfully analyzed '${workTitle}' with model '${modelToUse}'.`);
         return parsed as LiteraryResearchResult;
       } catch (parseErr) {
@@ -287,7 +347,8 @@ Yêu cầu dữ liệu trả về theo đúng định dạng JSON:
     }
   }
 
-  // If all attempts failed, throw structured error
+  // If all attempts failed, record failure in circuit breaker and throw structured error
+  circuitBreaker.recordFailure();
   const clean = extractCleanErrorMessage(lastError);
   const structuredError: any = new Error(clean.userMessage);
   structuredError.technicalDetails = clean.technicalDetails;

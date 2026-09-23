@@ -14,6 +14,10 @@ async function startServer() {
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
+  // Persistent uploads static route
+  const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
+  app.use('/uploads', express.static(uploadsDir));
+
   // API routes first
   app.use('/api', apiRouter);
 

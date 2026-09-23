@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { createRequire } from 'module';
+import { DatabaseSync } from 'node:sqlite';
 import type {
   User,
   Work,
@@ -19,16 +19,6 @@ import type {
   ReadingJourney,
   AchievementBadge,
 } from '../src/types.js';
-
-const require = createRequire(import.meta.url);
-// Import Node 22 native SQLite engine
-let DatabaseSync: any;
-try {
-  const sqlite = require('node:sqlite');
-  DatabaseSync = sqlite.DatabaseSync;
-} catch (e) {
-  console.warn('[Database] node:sqlite could not be loaded via require, will fallback:', e);
-}
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');

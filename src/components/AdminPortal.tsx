@@ -46,6 +46,7 @@ import type {
   MysteryRule,
   PrePublishReport,
   AiTestSuiteReport,
+  CharacterAiTestRecord,
   ChatMessage,
   CharacterStatus,
   CharacterVersion,
@@ -67,6 +68,7 @@ import {
   runPrePublishCheck,
   autoFixCharacter,
   runAiTestSuiteOnChar,
+  getAiTestRecord,
   saveAdminClues,
   getAdminClues,
   saveAdminMysteryRule,
@@ -200,7 +202,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Pre-Publish & Test Suite State
   const [prePublishReport, setPrePublishReport] = useState<PrePublishReport | null>(null);
   const [prePublishLoading, setPrePublishLoading] = useState(false);
-  const [testSuiteReport, setTestSuiteReport] = useState<AiTestSuiteReport | null>(null);
+  const [aiTestRecord, setAiTestRecord] = useState<CharacterAiTestRecord | null>(null);
   const [testSuiteLoading, setTestSuiteLoading] = useState(false);
 
   // Clues & Mystery state
@@ -292,7 +294,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setEditBoundaries((char.knowledgeBoundaries || []).join('\n'));
     }
     setPrePublishReport(null);
-    setTestSuiteReport(null);
+    getAiTestRecord(token, selectedCharId)
+      .then((rec) => {
+        setAiTestRecord(rec);
+      })
+      .catch(() => {
+        setAiTestRecord({
+          characterId: selectedCharId,
+          status: 'NOT_RUN',
+          passedCount: 0,
+          totalCount: 10,
+          report: null,
+        });
+      });
     setTestMessages([]);
   }, [token, selectedCharId, characters]);
 
@@ -998,11 +1012,30 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const handleRunAiTestSuite = async () => {
     if (!token || !selectedCharId) return;
     setTestSuiteLoading(true);
+    setAiTestRecord((prev) => ({
+      characterId: selectedCharId,
+      status: 'RUNNING',
+      passedCount: prev?.passedCount || 0,
+      totalCount: 10,
+      report: prev?.report || null,
+    }));
     try {
-      const report = await runAiTestSuiteOnChar(token, selectedCharId);
-      setTestSuiteReport(report);
-      setNotice(`Đã hoàn thành kiểm thử AI: ${report.passedCount}/${report.totalCount} vượt qua!`);
+      const record = await runAiTestSuiteOnChar(token, selectedCharId);
+      setAiTestRecord(record);
+      if (record.status === 'COMPLETED') {
+        setNotice(`Đã hoàn thành kiểm thử AI: ${record.passedCount}/${record.totalCount} vượt qua!`);
+      } else if (record.status === 'ERROR') {
+        setNotice(`Kiểm thử AI chưa hoàn tất: ${record.errorMessage || 'Lỗi kết nối AI.'}`);
+      }
     } catch (err: any) {
+      setAiTestRecord({
+        characterId: selectedCharId,
+        status: 'ERROR',
+        passedCount: 0,
+        totalCount: 10,
+        report: null,
+        errorMessage: err?.message || 'Lỗi kiểm thử AI.',
+      });
       setNotice('Lỗi kiểm thử: ' + err?.message);
     } finally {
       setTestSuiteLoading(false);
@@ -1334,6 +1367,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 onClick={() => {
                   switchTab('prepublish');
                   handleRunPrePublishCheck();
+                  if (token && selectedCharId) {
+                    getAiTestRecord(token, selectedCharId).then(setAiTestRecord).catch(() => {});
+                  }
                 }}
                 className={`w-full text-left px-3 py-2 rounded-xl flex items-center space-x-2 font-semibold transition-colors cursor-pointer ${
                   activeTab === 'prepublish'
@@ -2743,14 +2779,69 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </button>
                     </div>
 
-                    {testSuiteReport && (
+                    {/* AI Test Status Banner */}
+                    <div className="p-3.5 rounded-2xl bg-white border border-[#F5D889] flex items-center justify-between shadow-2xs">
+                      <div className="flex flex-col">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-sm text-[#332B35]">Kiểm thử AI:</span>
+                          {(!aiTestRecord || aiTestRecord.status === 'NOT_RUN') && (
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+                              CHƯA CHẠY
+                            </span>
+                          )}
+                          {aiTestRecord?.status === 'RUNNING' && (
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 animate-pulse">
+                              ĐANG CHẠY KIỂM THỬ...
+                            </span>
+                          )}
+                          {aiTestRecord?.status === 'COMPLETED' && (
+                            <span
+                              className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                                aiTestRecord.passedCount >= 7
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  : 'bg-amber-100 text-amber-800 border-amber-300'
+                              }`}
+                            >
+                              {aiTestRecord.passedCount}/{aiTestRecord.totalCount} vượt qua
+                            </span>
+                          )}
+                          {aiTestRecord?.status === 'ERROR' && (
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                              LỖI KẾT NỐI (CHƯA CHẠY THÀNH CÔNG)
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#6F91AA] mt-1">
+                          {(!aiTestRecord || aiTestRecord.status === 'NOT_RUN') &&
+                            'Nhân vật này chưa từng chạy bộ kiểm thử AI 10 kịch bản. Trạng thái CHƯA CHẠY không bị tính là lỗi và không ảnh hưởng đến việc đạt chuẩn xuất bản.'}
+                          {aiTestRecord?.status === 'RUNNING' &&
+                            'Hệ thống đang tiến hành đối soát 10 kịch bản an toàn và ranh giới kiến thức với nhân vật...'}
+                          {aiTestRecord?.status === 'COMPLETED' &&
+                            `Đã hoàn thành kiểm thử AI lúc ${new Date(aiTestRecord.lastRunAt || Date.now()).toLocaleTimeString('vi-VN')}. Có ${aiTestRecord.passedCount}/${aiTestRecord.totalCount} kịch bản vượt qua.`}
+                          {aiTestRecord?.status === 'ERROR' &&
+                            (aiTestRecord.errorMessage || 'Lỗi kết nối AI khi chạy kiểm thử. Vui lòng bấm nút phía trên để thử lại.')}
+                        </p>
+                      </div>
+
+                      {aiTestRecord?.status === 'COMPLETED' && (
+                        <div className="text-right shrink-0">
+                          <span className="text-sm font-bold text-[#332B35]">
+                            {aiTestRecord.passedCount} / {aiTestRecord.totalCount}
+                          </span>
+                          <p className="text-[10px] text-[#6F91AA]">Kịch bản đạt</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Scenario details ONLY when actually COMPLETED and report exists */}
+                    {aiTestRecord?.status === 'COMPLETED' && aiTestRecord.report && (
                       <div className="space-y-3">
                         <div className="p-3 rounded-2xl bg-white border border-[#F5D889] font-bold text-sm text-[#332B35] flex items-center justify-between">
-                          <span>Kết Quả: {testSuiteReport.passedCount} / {testSuiteReport.totalCount} Kịch Bản Đạt Tiêu Chuẩn</span>
+                          <span>Chi Tiết Kết Quả: {aiTestRecord.passedCount} / {aiTestRecord.totalCount} Kịch Bản Đạt Tiêu Chuẩn</span>
                         </div>
 
                         <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                          {testSuiteReport.results.map((r, i) => (
+                          {aiTestRecord.report.results.map((r, i) => (
                             <div
                               key={i}
                               className="p-3 rounded-xl bg-white border border-[#F5D889]/30 space-y-1.5"

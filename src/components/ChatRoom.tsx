@@ -146,7 +146,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({
       setFailedMessageText(text);
       setErrorMsg(
         err?.message ||
-          'Trang sách vừa bị gián đoạn kết nối. Hãy nhấn Thử lại để tiếp tục câu chuyện.'
+          'Xin lỗi, ta cần một chút thời gian để nhớ lại chuyện này. Hãy thử hỏi lại ta sau một lát.'
       );
     } finally {
       setLoading(false);

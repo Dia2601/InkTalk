@@ -228,3 +228,15 @@ export interface AiTestSuiteReport {
   results: AiTestCaseResult[];
 }
 
+export type AiTestStatus = 'NOT_RUN' | 'RUNNING' | 'COMPLETED' | 'ERROR';
+
+export interface CharacterAiTestRecord {
+  characterId: string;
+  status: AiTestStatus;
+  passedCount: number;
+  totalCount: number;
+  report?: AiTestSuiteReport | null;
+  lastRunAt?: string;
+  errorMessage?: string;
+}
+

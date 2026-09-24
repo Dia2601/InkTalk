@@ -489,6 +489,11 @@ apiRouter.post('/admin/auto-fix/:characterId', checkAdminAuth, (req, res) => {
 // ----------------------------------------------------
 // AI TEST SUITE (ADMIN ONLY)
 // ----------------------------------------------------
+apiRouter.get('/admin/ai-test-suite/:characterId', checkAdminAuth, (req, res) => {
+  const record = db.getAiTestRecord(req.params.characterId);
+  res.json(record);
+});
+
 apiRouter.post('/admin/ai-test-suite/:characterId', checkAdminAuth, async (req, res) => {
   const char = db.getCharacterById(req.params.characterId);
   if (!char) return res.status(404).json({ error: 'Không tìm thấy nhân vật.' });
@@ -498,9 +503,47 @@ apiRouter.post('/admin/ai-test-suite/:characterId', checkAdminAuth, async (req, 
 
   try {
     const report = await runAiTestSuite(char, clues, mysteryRule);
-    res.json(report);
+
+    const isConnectionFailure =
+      report.results.length > 0 &&
+      report.results.every((r) => r.response && r.response.startsWith('Lỗi kết nối kiểm tra'));
+
+    if (isConnectionFailure) {
+      const errorRecord = {
+        characterId: char.id,
+        status: 'ERROR' as const,
+        passedCount: 0,
+        totalCount: report.totalCount || 10,
+        report: null,
+        errorMessage: 'Lỗi kết nối AI khi chạy kiểm thử. Vui lòng kiểm tra lại kết nối.',
+        lastRunAt: new Date().toISOString(),
+      };
+      db.saveAiTestRecord(errorRecord);
+      return res.json(errorRecord);
+    }
+
+    const completedRecord = {
+      characterId: char.id,
+      status: 'COMPLETED' as const,
+      passedCount: report.passedCount,
+      totalCount: report.totalCount,
+      report,
+      lastRunAt: new Date().toISOString(),
+    };
+    db.saveAiTestRecord(completedRecord);
+    res.json(completedRecord);
   } catch (err: any) {
-    res.status(500).json({ error: err?.message || 'Chạy kiểm thử AI thất bại.' });
+    const errorRecord = {
+      characterId: char.id,
+      status: 'ERROR' as const,
+      passedCount: 0,
+      totalCount: 10,
+      report: null,
+      errorMessage: err?.message || 'Chạy kiểm thử AI thất bại.',
+      lastRunAt: new Date().toISOString(),
+    };
+    db.saveAiTestRecord(errorRecord);
+    res.status(500).json({ error: err?.message || 'Chạy kiểm thử AI thất bại.', record: errorRecord });
   }
 });
 
@@ -651,8 +694,7 @@ apiRouter.post('/chat/send', async (req, res) => {
     console.error('Chat generation error:', error);
     // CRITICAL REQUIREMENT: Do NOT deduct diamonds if API/network/server error occurs!
     res.status(500).json({
-      error: 'Có vẻ trang sách này vừa bị gián đoạn. Hãy thử gửi lại câu hỏi.',
-      details: error?.message,
+      error: 'Xin lỗi, ta cần một chút thời gian để nhớ lại chuyện này. Hãy thử hỏi lại ta sau một lát.',
     });
   }
 });

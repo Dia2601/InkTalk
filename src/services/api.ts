@@ -8,6 +8,7 @@ import type {
   ReadingJourney,
   PrePublishReport,
   AiTestSuiteReport,
+  CharacterAiTestRecord,
 } from '../types';
 
 const BASE_URL = '/api';
@@ -82,7 +83,7 @@ export async function sendChatMessage(
   });
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error || 'Có vẻ trang sách này vừa bị gián đoạn. Hãy thử gửi lại câu hỏi.');
+    throw new Error(data.error || 'Xin lỗi, ta cần một chút thời gian để nhớ lại chuyện này. Hãy thử hỏi lại ta sau một lát.');
   }
   return data;
 }
@@ -310,10 +311,23 @@ export async function autoFixCharacter(token: string, characterId: string) {
   return data;
 }
 
+export async function getAiTestRecord(
+  token: string,
+  characterId: string
+): Promise<CharacterAiTestRecord> {
+  const res = await fetch(`${BASE_URL}/admin/ai-test-suite/${characterId}`, {
+    method: 'GET',
+    headers: adminHeaders(token),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Lấy kết quả kiểm thử AI thất bại.');
+  return data;
+}
+
 export async function runAiTestSuiteOnChar(
   token: string,
   characterId: string
-): Promise<AiTestSuiteReport> {
+): Promise<CharacterAiTestRecord> {
   const res = await fetch(`${BASE_URL}/admin/ai-test-suite/${characterId}`, {
     method: 'POST',
     headers: adminHeaders(token),

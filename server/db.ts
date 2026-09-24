@@ -18,6 +18,7 @@ import type {
   ChatMessage,
   ReadingJourney,
   AchievementBadge,
+  CharacterAiTestRecord,
 } from '../src/types.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -188,6 +189,16 @@ export class InkTalkDatabase {
           errorMessage TEXT,
           createdAt TEXT,
           updatedAt TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS ai_test_records (
+          characterId TEXT PRIMARY KEY,
+          status TEXT,
+          passedCount INTEGER,
+          totalCount INTEGER,
+          report TEXT,
+          errorMessage TEXT,
+          lastRunAt TEXT
         );
       `);
 
@@ -1774,6 +1785,70 @@ export class InkTalkDatabase {
       this.sqlite.exec('ROLLBACK;');
       console.error('[Database] Failed to restore database:', e);
       return false;
+    }
+  }
+
+  // --- AI Test Suite Persistence (Per-Character) ---
+  getAiTestRecord(characterId: string): CharacterAiTestRecord {
+    try {
+      if (this.sqlite) {
+        const row = this.sqlite.prepare('SELECT * FROM ai_test_records WHERE characterId = ?').get(characterId) as any;
+        if (row) {
+          let parsedReport = null;
+          if (row.report) {
+            try {
+              parsedReport = JSON.parse(row.report);
+            } catch {}
+          }
+          return {
+            characterId,
+            status: (row.status as any) || 'NOT_RUN',
+            passedCount: Number(row.passedCount || 0),
+            totalCount: Number(row.totalCount || 10),
+            report: parsedReport,
+            errorMessage: row.errorMessage || undefined,
+            lastRunAt: row.lastRunAt || undefined,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('[Database] Could not get ai test record:', e);
+    }
+    return {
+      characterId,
+      status: 'NOT_RUN',
+      passedCount: 0,
+      totalCount: 10,
+      report: null,
+    };
+  }
+
+  saveAiTestRecord(record: CharacterAiTestRecord): void {
+    try {
+      if (this.sqlite) {
+        const stmt = this.sqlite.prepare(`
+          INSERT INTO ai_test_records (characterId, status, passedCount, totalCount, report, errorMessage, lastRunAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(characterId) DO UPDATE SET
+            status = excluded.status,
+            passedCount = excluded.passedCount,
+            totalCount = excluded.totalCount,
+            report = excluded.report,
+            errorMessage = excluded.errorMessage,
+            lastRunAt = excluded.lastRunAt
+        `);
+        stmt.run(
+          record.characterId,
+          record.status,
+          record.passedCount || 0,
+          record.totalCount || 10,
+          record.report ? JSON.stringify(record.report) : null,
+          record.errorMessage || null,
+          record.lastRunAt || new Date().toISOString()
+        );
+      }
+    } catch (e) {
+      console.warn('[Database] Could not save ai test record:', e);
     }
   }
 

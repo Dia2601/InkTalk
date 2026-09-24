@@ -579,7 +579,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         validCombinations: mysteryRule?.validCombinations || [],
         deductionSolution: {
           prompt: editDeductionPrompt,
-          correctClueIds: charClues.slice(0, 2).map((c) => c.id),
+          correctClueIds:
+            mysteryRule?.deductionSolution?.correctClueIds?.length
+              ? mysteryRule.deductionSolution.correctClueIds
+              : charClues.map((c) => c.id),
           explanation: editFinalReveal,
           finalReveal: editFinalReveal,
         },
@@ -928,19 +931,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       // 4. Save researched mystery rules
       if (researchResult.mysteryRule) {
+        const clueIds = (researchResult.clues || []).map((_: any, idx: number) => `clue_${newChar.id}_${idx}`);
         const rule: MysteryRule = {
           id: `rule_${newChar.id}`,
           characterId: newChar.id,
-          requiredClueIds: [],
+          requiredClueIds: clueIds,
           validCombinations: (researchResult.mysteryRule.validCombinations || []).map(
             (vc: any) => ({
-              clueIds: [],
+              clueIds: clueIds.slice(0, 2),
               relationshipReveal: vc.relationshipReveal,
             })
           ),
           deductionSolution: researchResult.mysteryRule.deductionSolution || {
             prompt: 'Nút thắt bi kịch là gì?',
-            correctClueIds: [],
+            correctClueIds: clueIds,
             explanation: '',
             finalReveal: '',
           },
@@ -1008,20 +1012,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Toggle Character Publish
   const handleTogglePublish = async (char: Character) => {
     if (!token) return;
-    if (!char.imageUrl) {
-      setNotice('KHÔNG THỂ XUẤT BẢN: Nhân vật bắt buộc phải có ảnh do Admin tải lên.');
-      return;
-    }
     try {
+      const nextPublished = !char.isPublished;
       await updateAdminCharacter(token, char.id, {
-        isPublished: !char.isPublished,
+        isPublished: nextPublished,
+        status: nextPublished ? 'PUBLISHED' : 'DRAFT',
       });
       refreshAdminData();
       onRefreshPublicData();
       setNotice(
-        char.isPublished
-          ? `Đã ẩn nhân vật "${char.name}" khỏi Thư viện người chơi.`
-          : `Đã XUẤT BẢN nhân vật "${char.name}" lên Thư viện người chơi!`
+        nextPublished
+          ? `✓ Đã XUẤT BẢN nhân vật "${char.name}" lên Thư viện người chơi!`
+          : `✓ Đã ẩn nhân vật "${char.name}" khỏi Thư viện người chơi.`
       );
     } catch (err: any) {
       setNotice('Lỗi xuất bản: ' + err?.message);
@@ -1924,7 +1926,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </h4>
                     </div>
                     <p className="text-[#493C5A] leading-relaxed">
-                      AI tuyệt đối <strong>KHÔNG ĐƯỢC</strong> tự sinh ảnh, tự chọn ảnh, tự thay ảnh, regenerate ảnh, recolor ảnh hay tạo avatar thay thế. Hệ thống <strong>chặn hoàn toàn lệnh Publish</strong> chừng nào Admin chưa cung cấp ảnh chân dung hợp lệ cho nhân vật.
+                      AI tuyệt đối <strong>KHÔNG ĐƯỢC</strong> tự sinh ảnh, tự chọn ảnh, tự thay ảnh hay tạo avatar thay thế. Ảnh nhân vật do Admin tải lên hoặc cung cấp URL. Nếu chưa có ảnh, hệ thống sẽ sử dụng ảnh minh họa trang bìa sách mặc định khi xuất bản.
                     </p>
                   </div>
 
@@ -1941,18 +1943,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             {selectedChar.imageUrl ? (
                               <strong className="text-emerald-700">🟢 Đã có ảnh Admin</strong>
                             ) : (
-                              <strong className="text-rose-700">🔴 CHƯA CÓ ẢNH NHÂN VẬT</strong>
+                              <strong className="text-amber-700">⚪ Chưa có ảnh riêng (Dùng ảnh minh họa mặc định)</strong>
                             )}
                           </span>
                         </div>
                         <div className="flex items-center space-x-2">
                           {selectedChar.imageUrl ? (
                             <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                              ✓ Hợp lệ để Xuất bản
+                              ✓ Đã có ảnh chính thức
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]">
-                              🚫 Bị chặn xuất bản
+                            <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">
+                              ⚠️ Dùng ảnh minh họa mặc định
                             </span>
                           )}
                         </div>

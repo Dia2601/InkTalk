@@ -168,8 +168,9 @@ export function runPrePublishSystemCheck(
       id: 'check_h',
       category: 'H. Hình ảnh nhân vật',
       label: 'Kiểm duyệt ảnh do Admin cung cấp',
-      status: 'BLOCKED',
-      message: 'CHƯA CÓ ẢNH NHÂN VẬT. Admin bắt buộc phải upload ảnh trước khi xuất bản.',
+      status: 'WARNING',
+      message: 'Chưa có ảnh nhân vật do Admin tải lên. Khi xuất bản, người chơi sẽ nhìn thấy ảnh minh họa mặc định. Bạn có thể bổ sung ảnh bất cứ lúc nào.',
+      canAutoFix: false,
     });
   }
 

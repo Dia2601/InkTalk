@@ -79,7 +79,7 @@ export function App() {
 
   useEffect(() => {
     loadCharacters();
-  }, []);
+  }, [currentPath]);
 
   // Load active session clues when character is selected
   const refreshSessionData = async () => {

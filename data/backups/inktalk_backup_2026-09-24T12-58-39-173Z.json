@@ -1,6 +1,6 @@
 {
   "exportVersion": "2.0.0",
-  "exportedAt": "2026-09-24T13:05:21.310Z",
+  "exportedAt": "2026-09-24T12:58:39.171Z",
   "users": [
     {
       "id": "usr_7d87ec39aea4",
@@ -13,15 +13,6 @@
     }
   ],
   "works": [
-    {
-      "id": "wrk_97869e306be1",
-      "title": "Lão Hạc",
-      "author": "Nam Cao",
-      "era": "Văn học 1930 - 1945",
-      "summary": "Truyện ngắn hiện thực xuất sắc về tình cha con và nhân cách cao đẹp của người nông dân.",
-      "chapters": [],
-      "createdAt": "2026-09-24T13:05:21.261Z"
-    },
     {
       "id": "wrk_808fc041c4f8",
       "title": "Chí Phèo",
@@ -43,85 +34,48 @@
   ],
   "characters": [
     {
-      "id": "chr_e1a09c2b0f02",
-      "workId": "wrk_808fc041c4f8",
+      "id": "chr_a8ebb98b49a6",
+      "workId": "wrk_default",
       "workTitle": "Chí Phèo",
-      "workAuthor": "Nam Cao",
-      "name": "Bá Kiến",
-      "role": "Nhân vật phản diện",
-      "badge": "unexpected",
-      "personality": "Nham hiểm, khôn róc đời, dùng người trị người.",
-      "voiceTone": "Cười giòn giã bề ngoài nhưng thâm hiểm bên trong.",
-      "pronouns": "tôi - anh bạn",
-      "perspective": "Kẻ thống trị lọc lõi coi nông dân như công cụ sai khiến.",
-      "knownFacts": [
-        "Ghen tuông đẩy Chí Phèo vào tù",
-        "Ném tiền cho Chí Phèo làm tay sai"
-      ],
-      "knowledgeBoundaries": [
-        "Không ngờ Chí Phèo liều mạng đâm chết mình"
-      ],
-      "shortIntro": "Cụ Bá làng Vũ Đại với nghệ thuật thống trị mềm nắn rắn buông...",
+      "workAuthor": "",
+      "name": "Thị Nở",
+      "role": "Nhân vật phụ",
+      "badge": "main",
+      "personality": "",
+      "voiceTone": "",
+      "pronouns": "tôi",
+      "perspective": "",
+      "knownFacts": [],
+      "knowledgeBoundaries": [],
+      "shortIntro": "",
       "imageUrl": "",
-      "isPublished": true,
-      "status": "PUBLISHED",
-      "version": 3,
-      "updatedAt": "2026-09-24T13:05:21.309Z",
-      "createdAt": "2026-09-24T13:05:21.287Z"
+      "isPublished": false,
+      "status": "DRAFT",
+      "version": 1,
+      "updatedAt": "2026-09-24T12:57:40.614Z",
+      "createdAt": "2026-09-24T12:57:40.614Z"
     },
     {
-      "id": "chr_e2aa7038c9ed",
-      "workId": "wrk_808fc041c4f8",
+      "id": "chr_7644fe99341f",
+      "workId": "wrk_default",
       "workTitle": "Chí Phèo",
-      "workAuthor": "Nam Cao",
+      "workAuthor": "",
       "name": "Thị Nở",
       "role": "Nhân vật phụ quan trọng",
-      "badge": "sub",
-      "personality": "Ngẩn ngơ, dở hơi nhưng chất chứa tình người mộc mạc.",
-      "voiceTone": "Hồn nhiên, vô tư, vụng về.",
-      "pronouns": "tôi - anh",
-      "perspective": "Người đàn bà đem bát cháo hành thức tỉnh linh hồn Chí Phèo.",
-      "knownFacts": [
-        "Nấu bát cháo hành cho Chí Phèo ăn giải cảm",
-        "Bị bà cô xua đuổi cấm đoán"
-      ],
-      "knowledgeBoundaries": [
-        "Không hiểu hết chiều sâu bi kịch xã hội"
-      ],
-      "shortIntro": "Người đàn bà xấu xí nhưng đã thắp sáng ngọn lửa lương thiện...",
-      "imageUrl": "",
-      "isPublished": true,
-      "status": "PUBLISHED",
-      "version": 1,
-      "updatedAt": "2026-09-24T13:05:21.280Z",
-      "createdAt": "2026-09-24T13:05:21.280Z"
-    },
-    {
-      "id": "chr_f6ca70ea24fb",
-      "workId": "wrk_97869e306be1",
-      "workTitle": "Lão Hạc",
-      "workAuthor": "Nam Cao",
-      "name": "Lão Hạc",
-      "role": "Nhân vật chính",
       "badge": "main",
-      "personality": "Lương thiện, giàu lòng tự trọng, thương con sâu sắc.",
-      "voiceTone": "Trầm buồn, khắc khoải, chân chất.",
-      "pronouns": "tôi - ông giáo",
-      "perspective": "Góc nhìn người cha nghèo thà chết trong sạch chứ không làm phiền xóm làng.",
-      "knownFacts": [
-        "Có một mảnh vườn và một con chó Vàng",
-        "Con trai phẫn chí đi làm đồn điền cao su"
-      ],
-      "knowledgeBoundaries": [
-        "Không biết tương lai của con trai ra sao"
-      ],
-      "shortIntro": "Người cha già nghèo khổ với lòng tự trọng cao ngút trời...",
+      "personality": "",
+      "voiceTone": "",
+      "pronouns": "tôi",
+      "perspective": "",
+      "knownFacts": [],
+      "knowledgeBoundaries": [],
+      "shortIntro": "",
       "imageUrl": "",
-      "isPublished": true,
-      "status": "PUBLISHED",
+      "isPublished": false,
+      "status": "DRAFT",
       "version": 1,
-      "updatedAt": "2026-09-24T13:05:21.273Z",
-      "createdAt": "2026-09-24T13:05:21.273Z"
+      "updatedAt": "2026-09-24T12:57:36.965Z",
+      "createdAt": "2026-09-24T12:57:36.965Z"
     },
     {
       "id": "chr_7efaa4c623c1",
@@ -149,8 +103,8 @@
       ],
       "shortIntro": "Kẻ ngơ ngác giữa ngã ba lương thiện và quỷ dữ làng Vũ Đại, mang theo vết sẹo bi thương của kiếp người cùng quẫn...",
       "imageUrl": "",
-      "isPublished": true,
-      "status": "PUBLISHED",
+      "isPublished": false,
+      "status": "DRAFT",
       "version": 2,
       "updatedAt": "2026-09-24T12:53:46.778Z",
       "createdAt": "2026-09-23T13:50:46.136Z"
@@ -203,46 +157,6 @@
       "snapshotData": "{\"workId\":\"wrk_default\",\"workTitle\":\"Chí Phèo\",\"workAuthor\":\"\",\"name\":\"Thị Nở\",\"role\":\"Nhân vật phụ\",\"badge\":\"main\",\"personality\":\"\",\"voiceTone\":\"\",\"pronouns\":\"tôi\",\"perspective\":\"\",\"knownFacts\":[],\"knowledgeBoundaries\":[],\"shortIntro\":\"\",\"imageUrl\":\"\",\"isPublished\":false,\"status\":\"DRAFT\",\"id\":\"chr_a8ebb98b49a6\",\"version\":1,\"updatedAt\":\"2026-09-24T12:57:40.614Z\",\"createdAt\":\"2026-09-24T12:57:40.614Z\"}",
       "changeSummary": "Khởi tạo nhân vật mới (Bản đầu tiên)",
       "createdAt": "2026-09-24T12:57:40.614Z"
-    },
-    {
-      "id": "ver_e3341f8ab455",
-      "characterId": "chr_f6ca70ea24fb",
-      "versionNumber": 1,
-      "snapshotData": "{\"workId\":\"wrk_97869e306be1\",\"workTitle\":\"Lão Hạc\",\"workAuthor\":\"Nam Cao\",\"name\":\"Lão Hạc\",\"role\":\"Nhân vật chính\",\"badge\":\"main\",\"personality\":\"Lương thiện, giàu lòng tự trọng, thương con sâu sắc.\",\"voiceTone\":\"Trầm buồn, khắc khoải, chân chất.\",\"pronouns\":\"tôi - ông giáo\",\"perspective\":\"Góc nhìn người cha nghèo thà chết trong sạch chứ không làm phiền xóm làng.\",\"knownFacts\":[\"Có một mảnh vườn và một con chó Vàng\",\"Con trai phẫn chí đi làm đồn điền cao su\"],\"knowledgeBoundaries\":[\"Không biết tương lai của con trai ra sao\"],\"shortIntro\":\"Người cha già nghèo khổ với lòng tự trọng cao ngút trời...\",\"imageUrl\":\"\",\"isPublished\":true,\"status\":\"PUBLISHED\",\"id\":\"chr_f6ca70ea24fb\",\"version\":1,\"updatedAt\":\"2026-09-24T13:05:21.273Z\",\"createdAt\":\"2026-09-24T13:05:21.273Z\"}",
-      "changeSummary": "Khởi tạo nhân vật mới (Bản đầu tiên)",
-      "createdAt": "2026-09-24T13:05:21.273Z"
-    },
-    {
-      "id": "ver_eba35c8171ce",
-      "characterId": "chr_e2aa7038c9ed",
-      "versionNumber": 1,
-      "snapshotData": "{\"workId\":\"wrk_808fc041c4f8\",\"workTitle\":\"Chí Phèo\",\"workAuthor\":\"Nam Cao\",\"name\":\"Thị Nở\",\"role\":\"Nhân vật phụ quan trọng\",\"badge\":\"sub\",\"personality\":\"Ngẩn ngơ, dở hơi nhưng chất chứa tình người mộc mạc.\",\"voiceTone\":\"Hồn nhiên, vô tư, vụng về.\",\"pronouns\":\"tôi - anh\",\"perspective\":\"Người đàn bà đem bát cháo hành thức tỉnh linh hồn Chí Phèo.\",\"knownFacts\":[\"Nấu bát cháo hành cho Chí Phèo ăn giải cảm\",\"Bị bà cô xua đuổi cấm đoán\"],\"knowledgeBoundaries\":[\"Không hiểu hết chiều sâu bi kịch xã hội\"],\"shortIntro\":\"Người đàn bà xấu xí nhưng đã thắp sáng ngọn lửa lương thiện...\",\"imageUrl\":\"\",\"isPublished\":true,\"status\":\"PUBLISHED\",\"id\":\"chr_e2aa7038c9ed\",\"version\":1,\"updatedAt\":\"2026-09-24T13:05:21.280Z\",\"createdAt\":\"2026-09-24T13:05:21.280Z\"}",
-      "changeSummary": "Khởi tạo nhân vật mới (Bản đầu tiên)",
-      "createdAt": "2026-09-24T13:05:21.280Z"
-    },
-    {
-      "id": "ver_cd305066593f",
-      "characterId": "chr_e1a09c2b0f02",
-      "versionNumber": 1,
-      "snapshotData": "{\"workId\":\"wrk_808fc041c4f8\",\"workTitle\":\"Chí Phèo\",\"workAuthor\":\"Nam Cao\",\"name\":\"Bá Kiến\",\"role\":\"Nhân vật phản diện\",\"badge\":\"unexpected\",\"personality\":\"Nham hiểm, khôn róc đời, dùng người trị người.\",\"voiceTone\":\"Cười giòn giã bề ngoài nhưng thâm hiểm bên trong.\",\"pronouns\":\"tôi - anh bạn\",\"perspective\":\"Kẻ thống trị lọc lõi coi nông dân như công cụ sai khiến.\",\"knownFacts\":[\"Ghen tuông đẩy Chí Phèo vào tù\",\"Ném tiền cho Chí Phèo làm tay sai\"],\"knowledgeBoundaries\":[\"Không ngờ Chí Phèo liều mạng đâm chết mình\"],\"shortIntro\":\"Cụ Bá làng Vũ Đại với nghệ thuật thống trị mềm nắn rắn buông...\",\"imageUrl\":\"\",\"isPublished\":true,\"status\":\"PUBLISHED\",\"id\":\"chr_e1a09c2b0f02\",\"version\":1,\"updatedAt\":\"2026-09-24T13:05:21.287Z\",\"createdAt\":\"2026-09-24T13:05:21.287Z\"}",
-      "changeSummary": "Khởi tạo nhân vật mới (Bản đầu tiên)",
-      "createdAt": "2026-09-24T13:05:21.287Z"
-    },
-    {
-      "id": "ver_10fa5c2dad3d",
-      "characterId": "chr_e1a09c2b0f02",
-      "versionNumber": 2,
-      "snapshotData": "{\"id\":\"chr_e1a09c2b0f02\",\"workId\":\"wrk_808fc041c4f8\",\"workTitle\":\"Chí Phèo\",\"workAuthor\":\"Nam Cao\",\"name\":\"Bá Kiến\",\"role\":\"Nhân vật phản diện\",\"badge\":\"unexpected\",\"personality\":\"Nham hiểm, khôn róc đời, dùng người trị người.\",\"voiceTone\":\"Cười giòn giã bề ngoài nhưng thâm hiểm bên trong.\",\"pronouns\":\"tôi - anh bạn\",\"perspective\":\"Kẻ thống trị lọc lõi coi nông dân như công cụ sai khiến.\",\"knownFacts\":[\"Ghen tuông đẩy Chí Phèo vào tù\",\"Ném tiền cho Chí Phèo làm tay sai\"],\"knowledgeBoundaries\":[\"Không ngờ Chí Phèo liều mạng đâm chết mình\"],\"shortIntro\":\"Cụ Bá làng Vũ Đại với nghệ thuật thống trị mềm nắn rắn buông...\",\"imageUrl\":\"\",\"isPublished\":false,\"status\":\"DRAFT\",\"version\":2,\"updatedAt\":\"2026-09-24T13:05:21.297Z\",\"createdAt\":\"2026-09-24T13:05:21.287Z\"}",
-      "changeSummary": "Chỉnh sửa thông tin nhân vật",
-      "createdAt": "2026-09-24T13:05:21.297Z"
-    },
-    {
-      "id": "ver_1de1fd99b2ff",
-      "characterId": "chr_e1a09c2b0f02",
-      "versionNumber": 3,
-      "snapshotData": "{\"id\":\"chr_e1a09c2b0f02\",\"workId\":\"wrk_808fc041c4f8\",\"workTitle\":\"Chí Phèo\",\"workAuthor\":\"Nam Cao\",\"name\":\"Bá Kiến\",\"role\":\"Nhân vật phản diện\",\"badge\":\"unexpected\",\"personality\":\"Nham hiểm, khôn róc đời, dùng người trị người.\",\"voiceTone\":\"Cười giòn giã bề ngoài nhưng thâm hiểm bên trong.\",\"pronouns\":\"tôi - anh bạn\",\"perspective\":\"Kẻ thống trị lọc lõi coi nông dân như công cụ sai khiến.\",\"knownFacts\":[\"Ghen tuông đẩy Chí Phèo vào tù\",\"Ném tiền cho Chí Phèo làm tay sai\"],\"knowledgeBoundaries\":[\"Không ngờ Chí Phèo liều mạng đâm chết mình\"],\"shortIntro\":\"Cụ Bá làng Vũ Đại với nghệ thuật thống trị mềm nắn rắn buông...\",\"imageUrl\":\"\",\"isPublished\":true,\"status\":\"PUBLISHED\",\"version\":3,\"updatedAt\":\"2026-09-24T13:05:21.309Z\",\"createdAt\":\"2026-09-24T13:05:21.287Z\"}",
-      "changeSummary": "Chỉnh sửa thông tin nhân vật",
-      "createdAt": "2026-09-24T13:05:21.309Z"
     }
   ],
   "characterDrafts": [],

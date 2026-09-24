@@ -181,6 +181,17 @@ export async function createAdminWork(token: string, work: Partial<Work>) {
   return data;
 }
 
+export async function updateAdminWork(token: string, id: string, updates: Partial<Work>) {
+  const res = await fetch(`${BASE_URL}/admin/works/${id}`, {
+    method: 'PUT',
+    headers: adminHeaders(token),
+    body: JSON.stringify(updates),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Không thể cập nhật tác phẩm.');
+  return data;
+}
+
 export async function deleteAdminWork(token: string, id: string) {
   const res = await fetch(`${BASE_URL}/admin/works/${id}`, {
     method: 'DELETE',

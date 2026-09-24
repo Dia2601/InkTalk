@@ -470,8 +470,8 @@ export class InkTalkDatabase {
           shortIntro:
             'Kẻ ngơ ngác giữa ngã ba lương thiện và quỷ dữ làng Vũ Đại, mang theo vết sẹo bi thương của kiếp người cùng quẫn...',
           imageUrl: '',
-          isPublished: false,
-          status: 'DRAFT',
+          isPublished: true,
+          status: 'PUBLISHED',
         });
 
         // Seed clues for Chí Phèo
@@ -795,6 +795,54 @@ export class InkTalkDatabase {
     return newWork;
   }
 
+  updateWork(id: string, updates: Partial<Work>): Work | undefined {
+    const existing = this.getWorkById(id);
+    if (!existing || !this.sqlite) return undefined;
+
+    const merged: Work = {
+      ...existing,
+      ...updates,
+    };
+
+    this.sqlite.exec('BEGIN TRANSACTION;');
+    try {
+      this.sqlite
+        .prepare(`
+          UPDATE works SET
+            title = ?, author = ?, era = ?, summary = ?, chapters = ?
+          WHERE id = ?
+        `)
+        .run(
+          merged.title,
+          merged.author,
+          merged.era || 'Văn học THPT',
+          merged.summary || '',
+          JSON.stringify(merged.chapters || []),
+          id
+        );
+
+      // If work title or author changed, cascade update to characters
+      if (updates.title || updates.author) {
+        this.sqlite
+          .prepare(`
+            UPDATE characters SET
+              workTitle = COALESCE(?, workTitle),
+              workAuthor = COALESCE(?, workAuthor)
+            WHERE workId = ?
+          `)
+          .run(updates.title || null, updates.author || null, id);
+      }
+
+      this.sqlite.exec('COMMIT;');
+      this.saveJsonSnapshot();
+      return merged;
+    } catch (e) {
+      this.sqlite.exec('ROLLBACK;');
+      console.error('[Database] Failed to update work transactionally:', e);
+      throw e;
+    }
+  }
+
   deleteWork(id: string): boolean {
     if (!this.sqlite) return false;
     this.sqlite.exec('BEGIN TRANSACTION;');
@@ -948,13 +996,34 @@ export class InkTalkDatabase {
     const newVersion = (existing.version || 1) + 1;
     const updatedAt = new Date().toISOString();
 
+    let isPublished = existing.isPublished;
+    let status = existing.status || 'DRAFT';
+
+    if (updates.isPublished !== undefined) {
+      isPublished = Boolean(updates.isPublished);
+      if (!isPublished && (!updates.status || updates.status === 'PUBLISHED')) {
+        status = 'DRAFT';
+      } else if (isPublished && !updates.status) {
+        status = 'PUBLISHED';
+      }
+    }
+
+    if (updates.status !== undefined) {
+      status = updates.status;
+      if (status === 'PUBLISHED') {
+        isPublished = true;
+      } else if (updates.isPublished === undefined) {
+        isPublished = false;
+      }
+    }
+
     const merged: Character = {
       ...existing,
       ...updates,
       version: newVersion,
       updatedAt,
-      isPublished: updates.isPublished !== undefined ? Boolean(updates.isPublished) : existing.isPublished,
-      status: updates.status || (updates.isPublished === true ? 'PUBLISHED' : existing.status || 'DRAFT'),
+      isPublished,
+      status,
     };
 
     this.sqlite.exec('BEGIN TRANSACTION;');
@@ -1122,19 +1191,21 @@ export class InkTalkDatabase {
       throw new Error('Định dạng dữ liệu ảnh Base64 không hợp lệ.');
     }
 
-    const rawExt = matches[1].toLowerCase();
-    const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt;
-    const buffer = Buffer.from(matches[2], 'base64');
+    // Attempt writing physical file for disk cache
+    try {
+      const rawExt = matches[1].toLowerCase();
+      const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt;
+      const buffer = Buffer.from(matches[2], 'base64');
+      const filename = `char_${characterId}_${Date.now()}.${ext}`;
+      const filePath = path.join(UPLOADS_DIR, filename);
+      fs.writeFileSync(filePath, buffer);
+    } catch (diskErr) {
+      console.warn('[Database] Local disk image cache write warning:', diskErr);
+    }
 
-    const filename = `char_${characterId}_${Date.now()}.${ext}`;
-    const filePath = path.join(UPLOADS_DIR, filename);
-
-    // Write physical file to persistent storage
-    fs.writeFileSync(filePath, buffer);
-
-    const publicUrl = `/uploads/${filename}`;
-    this.updateCharacter(characterId, { imageUrl: publicUrl }, 'Tải lên ảnh chân dung nhân vật');
-    return publicUrl;
+    // Persist dataUrl directly in database and json snapshot so image is durable in containerized environments
+    this.updateCharacter(characterId, { imageUrl: dataUrl }, 'Tải lên ảnh chân dung nhân vật');
+    return dataUrl;
   }
 
   // --- Clues & Mystery Rules ---

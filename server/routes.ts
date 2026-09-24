@@ -197,6 +197,17 @@ apiRouter.post('/admin/works', checkAdminAuth, (req, res) => {
   res.json(work);
 });
 
+apiRouter.put('/admin/works/:id', checkAdminAuth, (req, res) => {
+  try {
+    const updated = db.updateWork(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Không tìm thấy tác phẩm.' });
+    res.json(updated);
+  } catch (err: any) {
+    console.error('[API /admin/works/:id] Failed to update work:', err);
+    res.status(500).json({ error: 'Không thể cập nhật tác phẩm: ' + err?.message });
+  }
+});
+
 apiRouter.delete('/admin/works/:id', checkAdminAuth, (req, res) => {
   const success = db.deleteWork(req.params.id);
   res.json({ success });
@@ -277,16 +288,6 @@ apiRouter.post('/admin/characters', checkAdminAuth, (req, res) => {
 apiRouter.put('/admin/characters/:id', checkAdminAuth, (req, res) => {
   const existing = db.getCharacterById(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Không tìm thấy nhân vật.' });
-
-  // Rule 9: If Admin attempts to publish without an image, block publish!
-  if (req.body.isPublished === true || req.body.status === 'PUBLISHED') {
-    const finalImage = req.body.imageUrl !== undefined ? req.body.imageUrl : existing.imageUrl;
-    if (!finalImage || !finalImage.trim()) {
-      return res.status(400).json({
-        error: 'KHÔNG THỂ XUẤT BẢN: Nhân vật chưa có ảnh do Admin cung cấp. Vui lòng tải ảnh lên trước khi xuất bản.',
-      });
-    }
-  }
 
   try {
     const changeSummary = req.body.changeSummary || 'Chỉnh sửa thông tin nhân vật';

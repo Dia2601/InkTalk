@@ -64,8 +64,27 @@ export async function getCharacterById(id: string): Promise<Character | null> {
   return res.json();
 }
 
+export async function getCurrentPlayer(fallbackId?: string, username?: string) {
+  const params = new URLSearchParams();
+  if (fallbackId) params.append('userId', fallbackId);
+  if (username) params.append('username', username);
+  const res = await fetch(`${BASE_URL}/auth/current-player?${params.toString()}`, {
+    headers: {
+      'X-User-Id': fallbackId || '',
+      'X-Player-Id': fallbackId || '',
+    },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function getChatSession(userId: string, characterId: string) {
-  const res = await fetch(`${BASE_URL}/chat/session/${userId}/${characterId}`);
+  const res = await fetch(`${BASE_URL}/chat/session/${userId}/${characterId}`, {
+    headers: {
+      'X-User-Id': userId || '',
+      'X-Player-Id': userId || '',
+    },
+  });
   if (!res.ok) throw new Error('Không thể tải phiên trò chuyện.');
   return res.json();
 }
@@ -76,10 +95,31 @@ export async function sendChatMessage(
   messageText: string,
   isTestMode = false
 ) {
+  let username: string | undefined = undefined;
+  try {
+    const saved = localStorage.getItem('inktalk_user');
+    if (saved) {
+      username = JSON.parse(saved)?.username;
+    }
+  } catch {
+    // silent
+  }
+
   const res = await fetch(`${BASE_URL}/chat/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, characterId, messageText, isTestMode }),
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': userId || '',
+      'X-Player-Id': userId || '',
+    },
+    body: JSON.stringify({
+      userId,
+      playerId: userId,
+      username,
+      characterId,
+      messageText,
+      isTestMode,
+    }),
   });
   const data = await res.json();
   if (!res.ok) {

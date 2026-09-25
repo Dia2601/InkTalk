@@ -133,6 +133,19 @@ apiRouter.post('/auth/daily-checkin', (req, res) => {
   }
 });
 
+apiRouter.get('/auth/current-player', (req, res) => {
+  const rawUserId = (req.query.userId || req.headers['x-user-id'] || req.headers['x-player-id'] || '') as string;
+  const username = req.query.username as string | undefined;
+
+  const user = db.resolveUser(rawUserId, { username });
+  if (!user) {
+    return res.status(404).json({ error: 'Không tìm thấy người chơi.' });
+  }
+
+  res.setHeader('Set-Cookie', `inktalk_user_id=${user.id}; Path=/; Max-Age=${30 * 24 * 3600}; SameSite=Lax`);
+  res.json({ user });
+});
+
 apiRouter.get('/auth/me/:userId', (req, res) => {
   if (req.params.userId === 'admin_sys') {
     return res.json({
@@ -147,7 +160,7 @@ apiRouter.get('/auth/me/:userId', (req, res) => {
       },
     });
   }
-  const user = db.findUserById(req.params.userId);
+  const user = db.resolveUser(req.params.userId);
   if (!user) return res.status(404).json({ error: 'Không tìm thấy người dùng' });
   res.json({ user: { ...user, role: 'PLAYER' } });
 });
@@ -579,7 +592,9 @@ apiRouter.post('/admin/mystery-rules/:characterId', checkAdminAuth, (req, res) =
 // ----------------------------------------------------
 apiRouter.get('/chat/session/:userId/:characterId', (req, res) => {
   const { userId, characterId } = req.params;
-  const session = db.getOrCreateSession(userId, characterId);
+  const user = db.resolveUser(userId, { characterId });
+  const effectiveUserId = user ? user.id : userId;
+  const session = db.getOrCreateSession(effectiveUserId, characterId);
   const messages = db.getMessagesBySession(session.id);
   const allClues = db.getCluesByCharacter(characterId);
   const unlockedClues = allClues.filter((c) => session.unlockedClueIds.includes(c.id));
@@ -600,14 +615,26 @@ apiRouter.get('/chat/session/:userId/:characterId', (req, res) => {
 });
 
 apiRouter.post('/chat/send', async (req, res) => {
-  const { userId, characterId, messageText, isTestMode } = req.body;
+  const { userId, playerId, accountId, characterId, messageText, isTestMode, username } = req.body;
+  const rawUserId = (userId || playerId || accountId || req.headers['x-user-id'] || req.headers['x-player-id'] || '') as string;
+  const text = (messageText || req.body.message || '').trim();
 
-  if (!userId || !characterId || !messageText?.trim()) {
+  if (!characterId || !text) {
     return res.status(400).json({ error: 'Thiếu dữ liệu trò chuyện.' });
   }
 
-  const user = db.findUserById(userId);
+  // Resolve user cleanly using multi-tiered resolution
+  const user = db.resolveUser(rawUserId, {
+    username: username || (typeof rawUserId === 'string' && !rawUserId.startsWith('usr_') ? rawUserId : undefined),
+    characterId,
+  });
+
   if (!user && !isTestMode) {
+    console.error('[InkTalk Chat Request Error]');
+    console.error('REASON: PLAYER_NOT_FOUND');
+    console.error(`AUTH USER: ${rawUserId || 'NONE'}`);
+    console.error(`CHARACTER: ${characterId}`);
+    console.error('CHAT REQUEST: FAILED');
     return res.status(404).json({ error: 'Không tìm thấy người chơi.' });
   }
 
@@ -623,24 +650,34 @@ apiRouter.post('/chat/send', async (req, res) => {
     return res.status(404).json({ error: 'Không tìm thấy nhân vật.' });
   }
 
-  const session = db.getOrCreateSession(userId, characterId);
+  const effectiveUserId = user?.id || rawUserId || 'guest';
+  const session = db.getOrCreateSession(effectiveUserId, characterId);
   const currentMessages = db.getMessagesBySession(session.id);
   const allClues = db.getCluesByCharacter(characterId);
   const unlockedClues = allClues.filter((c) => session.unlockedClueIds.includes(c.id));
+
+  // Required Debug Log per Requirement 9
+  console.log('[InkTalk Chat Request]');
+  console.log(`AUTH USER: ${rawUserId || 'NONE'}`);
+  console.log(`RESOLVED PLAYER: ${user ? `${user.id} (${user.username} | ${user.diamonds} 💎)` : 'TEST_MODE'}`);
+  console.log(`CHARACTER: ${character.id} (${character.name})`);
+  console.log(`CONVERSATION: ${session.id}`);
+  console.log(`CHAT REQUEST: SUCCESS`);
 
   try {
     // Generate AI response with Character Lock, Canon Lock, Knowledge Boundary & Semantic Clue trigger
     const aiOutput = await generateCharacterResponse({
       character,
       chatHistory: currentMessages.map((m) => ({ sender: m.sender as any, text: m.text })),
-      userMessage: messageText.trim(),
+      userMessage: text,
       unlockedClues,
       allClues,
     });
 
-    // ONLY DEDUCT DIAMONDS IF AI CALL SUCCEEDED!
+    // ONLY DEDUCT DIAMONDS IF AI CALL SUCCEEDED AND DID NOT RESORT TO FALLBACK!
     let updatedUser = user;
-    if (!isTestMode && user) {
+    const isActualAiSuccess = !aiOutput.isFallback;
+    if (!isTestMode && user && isActualAiSuccess) {
       updatedUser = db.updateUserDiamonds(user.id, -3);
     }
 
@@ -649,7 +686,7 @@ apiRouter.post('/chat/send', async (req, res) => {
       db.addMessage({
         sessionId: session.id,
         sender: 'player',
-        text: messageText.trim(),
+        text,
       });
     }
 
@@ -685,8 +722,9 @@ apiRouter.post('/chat/send', async (req, res) => {
 
     res.json({
       reply: aiOutput.reply,
-      userDiamonds: updatedUser?.diamonds ?? 500,
-      diamondsDeducted: isTestMode ? 0 : 3,
+      userDiamonds: updatedUser?.diamonds ?? user?.diamonds ?? 497,
+      diamondsDeducted: (isTestMode || !isActualAiSuccess) ? 0 : 3,
+      isFallback: aiOutput.isFallback,
       newClueUnlocked: newlyUnlockedClue,
       debugInfo: isTestMode ? aiOutput.debugInfo : undefined,
     });

@@ -15,6 +15,7 @@ import {
   dailyCheckin,
   getChatSession,
   getAdminClues,
+  getCurrentPlayer,
 } from './services/api';
 import { Sparkles } from 'lucide-react';
 
@@ -76,6 +77,26 @@ export function App() {
       console.error('Failed to load published characters:', err);
     }
   };
+
+  // Verify and synchronize active player on startup (Requirement 3: Không dựa vào localStorage làm nguồn duy nhất)
+  useEffect(() => {
+    let isMounted = true;
+    getCurrentPlayer(currentUser?.id, currentUser?.username)
+      .then((data) => {
+        if (!isMounted || !data?.user) return;
+        const syncedUser = { ...data.user, role: data.user.role || 'PLAYER' };
+        setCurrentUser(syncedUser);
+        localStorage.setItem('inktalk_user', JSON.stringify(syncedUser));
+        localStorage.setItem('inktalk_has_started', 'true');
+        setHasStarted(true);
+      })
+      .catch((err) => {
+        console.warn('Player sync check:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     loadCharacters();

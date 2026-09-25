@@ -158,6 +158,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharId, setSelectedCharId] = useState<string>('');
 
+  // Character Editing State (Requirement II & III)
+  const [isEditingChar, setIsEditingChar] = useState(false);
+  const [editCharName, setEditCharName] = useState('');
+  const [editCharRole, setEditCharRole] = useState('');
+  const [editCharBadge, setEditCharBadge] = useState<CharacterBadge>('main');
+  const [editCharPersonality, setEditCharPersonality] = useState('');
+  const [editCharVoice, setEditCharVoice] = useState('');
+  const [editCharPronouns, setEditCharPronouns] = useState('');
+  const [editCharPerspective, setEditCharPerspective] = useState('');
+  const [editCharShortIntro, setEditCharShortIntro] = useState('');
+  const [editCharSaving, setEditCharSaving] = useState(false);
+
   // Character Versioning State
   const [characterVersions, setCharacterVersions] = useState<CharacterVersion[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
@@ -290,8 +302,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     const char = characters.find((c) => c.id === selectedCharId);
     if (char) {
       setCharImageUrlInput(char.imageUrl || '');
-      setEditCanonFacts((char.knownFacts || []).join('\n'));
-      setEditBoundaries((char.knowledgeBoundaries || []).join('\n'));
+      setEditCanonFacts((char.knownFacts || []).join('
+'));
+      setEditBoundaries((char.knowledgeBoundaries || []).join('
+'));
+      setEditCharName(char.name || '');
+      setEditCharRole(char.role || '');
+      setEditCharBadge(char.badge || 'main');
+      setEditCharPersonality(char.personality || '');
+      setEditCharVoice(char.voiceTone || '');
+      setEditCharPronouns(char.pronouns || '');
+      setEditCharPerspective(char.perspective || '');
+      setEditCharShortIntro(char.shortIntro || '');
+      setIsEditingChar(false);
     }
     setPrePublishReport(null);
     getAiTestRecord(token, selectedCharId)
@@ -651,6 +674,34 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setNotice('Đã xoá manh mối thành công.');
     } catch (err: any) {
       setNotice('Lỗi xoá manh mối: ' + err?.message);
+    }
+  };
+
+  // Save Character Core Details (Requirement II, III, IV)
+  const handleSaveCharCore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !selectedCharId || !selectedChar) return;
+    setEditCharSaving(true);
+    try {
+      await updateAdminCharacter(token, selectedCharId, {
+        name: editCharName.trim(),
+        role: editCharRole.trim(),
+        badge: editCharBadge,
+        personality: editCharPersonality.trim(),
+        voiceTone: editCharVoice.trim(),
+        pronouns: editCharPronouns.trim(),
+        perspective: editCharPerspective.trim(),
+        shortIntro: editCharShortIntro.trim(),
+      });
+      setNotice('✓ Đã lưu thay đổi cốt lõi cho nhân vật ' + editCharName + ' vào cơ sở dữ liệu!');
+      setIsEditingChar(false);
+      await refreshAdminData();
+      await onRefreshPublicData();
+      getCharacterVersions(token, selectedCharId).then(setCharacterVersions);
+    } catch (err: any) {
+      setNotice('Lỗi lưu thay đổi nhân vật: ' + err?.message);
+    } finally {
+      setEditCharSaving(false);
     }
   };
 
@@ -1674,37 +1725,216 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         </div>
                       </div>
 
-                      {/* Character Persona details */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-[#FFF8F1]">
-                        <div>
-                          <span className="font-bold text-[#493C5A]">Cách xưng hô:</span>{' '}
-                          {selectedChar.pronouns}
-                        </div>
-                        <div>
-                          <span className="font-bold text-[#493C5A]">Giọng văn:</span>{' '}
-                          {selectedChar.voiceTone}
-                        </div>
-                        <div className="sm:col-span-2">
-                          <span className="font-bold text-[#493C5A]">Điều nhân vật biết:</span>
-                          <ul className="list-disc list-inside text-[#5A4650] mt-1 space-y-0.5">
-                            {selectedChar.knownFacts.map((f, i) => (
-                              <li key={i}>{f}</li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <span className="font-bold text-[#493C5A]">
-                            Giới hạn kiến thức (Không biết):
-                          </span>
-                          <ul className="list-disc list-inside text-red-700 mt-1 space-y-0.5">
-                            {selectedChar.knowledgeBoundaries.map((b, i) => (
-                              <li key={i}>{b}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
+                      {/* Character Persona details & Edit Form (Requirement II, III, IV) */}
+                      {!isEditingChar ? (
+                        <div className="space-y-3 pt-3 border-t border-[#FFF8F1]">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-xs text-[#332B35] uppercase tracking-wide">
+                              Thông Tin Nhân Vật Cốt Lõi (Character Core)
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditCharName(selectedChar.name);
+                                setEditCharRole(selectedChar.role);
+                                setEditCharBadge(selectedChar.badge);
+                                setEditCharPersonality(selectedChar.personality);
+                                setEditCharVoice(selectedChar.voiceTone);
+                                setEditCharPronouns(selectedChar.pronouns);
+                                setEditCharPerspective(selectedChar.perspective || '');
+                                setEditCharShortIntro(selectedChar.shortIntro || '');
+                                setIsEditingChar(true);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-white border border-[#C9B5EA] hover:bg-[#F3B8C8]/20 font-bold text-xs text-[#332B35] shadow-2xs flex items-center space-x-1.5 cursor-pointer"
+                            >
+                              <Edit className="w-3.5 h-3.5 text-[#B83253]" />
+                              <span>Chỉnh Sửa Toàn Bộ Dữ Liệu Nhân Vật</span>
+                            </button>
+                          </div>
 
-                      {/* REQUIREMENT 8: VERSION HISTORY PANEL */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <span className="font-bold text-[#493C5A]">Phân loại thẻ:</span>{' '}
+                              <span className="font-semibold">{selectedChar.badge === 'main' ? 'Nhân vật chính' : selectedChar.badge === 'sub' ? 'Nhân vật phụ' : 'Góc nhìn bất ngờ'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-[#493C5A]">Tính cách:</span>{' '}
+                              <span>{selectedChar.personality}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-[#493C5A]">Cách xưng hô:</span>{' '}
+                              {selectedChar.pronouns}
+                            </div>
+                            <div>
+                              <span className="font-bold text-[#493C5A]">Giọng văn & khẩu khí:</span>{' '}
+                              {selectedChar.voiceTone}
+                            </div>
+                            <div className="sm:col-span-2">
+                              <span className="font-bold text-[#493C5A]">Góc nhìn & thế giới quan:</span>{' '}
+                              <span>{selectedChar.perspective || '(Chưa điền)'}</span>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <span className="font-bold text-[#493C5A]">Lời tự bạch ngắn:</span>{' '}
+                              <span className="italic text-[#5A4650]">{selectedChar.shortIntro || '(Chưa điền)'}</span>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <span className="font-bold text-[#493C5A]">Điều nhân vật biết (Known Facts):</span>
+                              <ul className="list-disc list-inside text-[#5A4650] mt-1 space-y-0.5">
+                                {selectedChar.knownFacts.map((f, i) => (
+                                  <li key={i}>{f}</li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <span className="font-bold text-[#493C5A]">
+                                Giới hạn kiến thức - KHÔNG BIẾT (Knowledge Boundaries):
+                              </span>
+                              <ul className="list-disc list-inside text-red-700 mt-1 space-y-0.5">
+                                {selectedChar.knowledgeBoundaries.map((b, i) => (
+                                  <li key={i}>{b}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <form onSubmit={handleSaveCharCore} className="space-y-4 pt-3 border-t-2 border-[#F3B8C8] bg-rose-50/20 p-3 rounded-2xl">
+                          <div className="flex items-center justify-between border-b border-[#F3B8C8]/50 pb-2">
+                            <div className="flex items-center space-x-2">
+                              <Edit className="w-4 h-4 text-[#B83253]" />
+                              <h4 className="font-bold text-sm text-[#B83253]">
+                                Đang Chỉnh Sửa Nhân Vật: {selectedChar.name}
+                              </h4>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingChar(false)}
+                                className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#5A4650] font-medium text-xs cursor-pointer"
+                              >
+                                Hủy bỏ
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={editCharSaving}
+                                className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#F3B8C8] to-[#F5D889] text-[#332B35] font-bold text-xs shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 flex items-center space-x-1.5"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                <span>{editCharSaving ? 'Đang Lưu...' : 'LƯU THAY ĐỔI VÀO DATABASE'}</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="font-bold text-[#5A4650] block mb-1">Tên nhân vật:</label>
+                              <input
+                                type="text"
+                                required
+                                value={editCharName}
+                                onChange={(e) => setEditCharName(e.target.value)}
+                                className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/60 bg-white font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="font-bold text-[#5A4650] block mb-1">Vai trò:</label>
+                              <input
+                                type="text"
+                                required
+                                value={editCharRole}
+                                onChange={(e) => setEditCharRole(e.target.value)}
+                                className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/60 bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="font-bold text-[#5A4650] block mb-1">Phân loại thẻ:</label>
+                              <select
+                                value={editCharBadge}
+                                onChange={(e) => setEditCharBadge(e.target.value as any)}
+                                className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/60 bg-white"
+                              >
+                                <option value="main">Nhân vật chính</option>
+                                <option value="sub">Nhân vật phụ</option>
+                                <option value="unexpected">Góc nhìn bất ngờ</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="font-bold text-[#5A4650] block mb-1">Tính cách:</label>
+                              <input
+                                type="text"
+                                required
+                                value={editCharPersonality}
+                                onChange={(e) => setEditCharPersonality(e.target.value)}
+                                className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/60 bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="font-bold text-[#5A4650] block mb-1">Xưng hô (đại từ):</label>
+                              <input
+                                type="text"
+                                required
+                                value={editCharPronouns}
+                                onChange={(e) => setEditCharPronouns(e.target.value)}
+                                className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/60 bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="font-bold text-[#5A4650] block mb-1">Giọng văn & khẩu khí:</label>
+                              <input
+                                type="text"
+                                required
+                                value={editCharVoice}
+                                onChange={(e) => setEditCharVoice(e.target.value)}
+                                className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/60 bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="font-bold text-[#5A4650] block mb-1">Góc nhìn & thế giới quan:</label>
+                              <input
+                                type="text"
+                                value={editCharPerspective}
+                                onChange={(e) => setEditCharPerspective(e.target.value)}
+                                className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/60 bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="font-bold text-[#5A4650] block mb-1">Lời tự bạch ngắn (không spoil):</label>
+                            <input
+                              type="text"
+                              value={editCharShortIntro}
+                              onChange={(e) => setEditCharShortIntro(e.target.value)}
+                              className="w-full p-2.5 rounded-xl border border-[#C9B5EA]/60 bg-white"
+                            />
+                          </div>
+
+                          <div className="flex justify-end space-x-2 pt-2 border-t border-[#C9B5EA]/30">
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingChar(false)}
+                              className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-[#5A4650] font-medium text-xs cursor-pointer"
+                            >
+                              Hủy bỏ
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={editCharSaving}
+                              className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F3B8C8] to-[#F5D889] text-[#332B35] font-bold text-xs shadow-md hover:shadow-lg cursor-pointer disabled:opacity-50 flex items-center space-x-2"
+                            >
+                              <Save className="w-4 h-4" />
+                              <span>{editCharSaving ? 'Đang Lưu...' : 'XÁC NHẬN VÀ LƯU DATABASE'}</span>
+                            </button>
+                          </div>
+                        </form>
+                      )}
+{/* REQUIREMENT 8: VERSION HISTORY PANEL */}
                       <div className="pt-4 border-t border-[#F5D889]/30 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">

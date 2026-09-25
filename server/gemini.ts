@@ -294,7 +294,7 @@ Yêu cầu phân tích chi tiết chuẩn chương trình Ngữ Văn THPT Việt
    - replayMinQuestions: 20
 6. UncertaintyReport: các chi tiết còn nhiều tranh cãi hoặc dị bản văn học nếu có.`;
 
-  const modelCandidates = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const modelCandidates = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-3.8-flash'];
   const retryDelays = [1500, 3500, 7000];
   let lastError: any = null;
 
@@ -356,6 +356,7 @@ export interface CharacterChatParams {
 export interface CharacterChatOutput {
   reply: string;
   triggeredClue?: Clue;
+  isFallback?: boolean;
   debugInfo: {
     characterLock: boolean;
     canonLock: boolean;
@@ -490,7 +491,7 @@ Thực hiện âm thầm trong tâm trí trước khi đưa ra lời thoại cu�
     formattedHistory.push({ role: 'user', parts: [{ text: userMessage }] });
   }
 
-  const chatModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const chatModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3-flash-preview'];
   let replyText = '';
   let lastChatErr: any = null;
 
@@ -522,9 +523,12 @@ Thực hiện âm thầm trong tâm trí trước khi đưa ra lời thoại cu�
     } catch (mErr: any) {
       lastChatErr = mErr;
       const retryable = isRetryableAiError(mErr);
-      console.warn(`[Character Chat Engine] Model ${m} attempt ${attempt + 1} failed:`, mErr?.message || mErr);
-      if (retryable && attempt < chatModels.length - 1) {
-        await sleep(750 * (attempt + 1));
+      const isQuotaOrRateLimit = String(mErr?.message || '').includes('429') || String(mErr?.status || '') === '429' || String(mErr?.message || '').includes('quota');
+      console.warn(`[Character Chat Engine] Model ${m} attempt ${attempt + 1} failed (fallbacking to next model if available):`, mErr?.message || mErr);
+      if (attempt < chatModels.length - 1) {
+        if (!isQuotaOrRateLimit) {
+          await sleep(500 * (attempt + 1));
+        }
         continue;
       }
       break;
@@ -532,9 +536,11 @@ Thực hiện âm thầm trong tâm trí trước khi đưa ra lời thoại cu�
   }
 
   // Graceful isolation fallback: if AI models fail after all retries, return polite in-character message
+  let isFallbackResponse = false;
   if (!replyText) {
-    console.error('[Character Chat Engine] All models failed. Falling back to in-character polite notice:', lastChatErr?.message);
+    console.error('[Character Chat Engine] All models failed after retries. Notice:', lastChatErr?.message);
     replyText = politeCharacterFallback;
+    isFallbackResponse = true;
   }
 
   // Semantic Clue Trigger Check
@@ -556,13 +562,14 @@ Thực hiện âm thầm trong tâm trí trước khi đưa ra lời thoại cu�
   return {
     reply: replyText || politeCharacterFallback,
     triggeredClue,
+    isFallback: isFallbackResponse,
     debugInfo: {
-      characterLock: true,
-      canonLock: true,
-      knowledgeBoundaryCompliant: true,
-      intent: 'Literary inquiry & deep emotional dialogue',
+      characterLock: !isFallbackResponse,
+      canonLock: !isFallbackResponse,
+      knowledgeBoundaryCompliant: !isFallbackResponse,
+      intent: isFallbackResponse ? 'Fallback notice' : 'Literary inquiry & deep emotional dialogue',
       questionCount: chatHistory.filter((m) => m.sender === 'player').length + 1,
-      selfCheckPassed: true,
+      selfCheckPassed: !isFallbackResponse,
     },
   };
 }
@@ -670,7 +677,14 @@ export async function runAiTestSuite(
 
       const responseDepth = reply.length > 30;
 
+      const isFallback =
+        lower.includes('cần một chút thời gian để nhớ lại') ||
+        lower.includes('lỗi kết nối') ||
+        lower.includes('chưa thể kết nối') ||
+        lower.includes('gián đoạn');
+
       const passed =
+        !isFallback &&
         characterLock &&
         canonLock &&
         knowledgeBoundary &&
@@ -691,7 +705,11 @@ export async function runAiTestSuite(
           responseDepth,
         },
         passed,
-        notes: passed ? 'Đạt tiêu chuẩn bảo vệ nhân vật và nguyên tác.' : 'Cần rà soát thêm chi tiết.',
+        notes: isFallback
+          ? 'Kiểm thử không đạt vì AI trả về câu thông báo tạm hoãn (fallback).'
+          : passed
+          ? 'Đạt tiêu chuẩn bảo vệ nhân vật và nguyên tác.'
+          : 'Cần rà soát thêm chi tiết.',
       });
     } catch (err: any) {
       results.push({

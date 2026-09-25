@@ -1,11 +1,11 @@
 {
   "exportVersion": "2.0.0",
-  "exportedAt": "2026-09-24T13:05:21.310Z",
+  "exportedAt": "2026-09-25T14:22:24.665Z",
   "users": [
     {
       "id": "usr_7d87ec39aea4",
       "username": "ThanhTam",
-      "diamonds": 497,
+      "diamonds": 491,
       "lastLoginDate": "2026-09-21",
       "claimedWelcomeBonus": 1,
       "role": "PLAYER",
@@ -422,6 +422,32 @@
       "testLockedUntilQuestion": 0,
       "completed": false,
       "createdAt": "2026-09-21T23:47:27.407Z"
+    },
+    {
+      "id": "ses_57fc06f17131",
+      "userId": "usr_7d87ec39aea4",
+      "characterId": "chr_f6ca70ea24fb",
+      "questionCount": 4,
+      "isReplay": false,
+      "unlockedClueIds": [],
+      "decodedCombinationIds": [],
+      "failedAttempts": 0,
+      "testLockedUntilQuestion": 0,
+      "completed": false,
+      "createdAt": "2026-09-25T14:05:43.047Z"
+    },
+    {
+      "id": "ses_c9d0b6f128a8",
+      "userId": "usr_7d87ec39aea4",
+      "characterId": "chr_e1a09c2b0f02",
+      "questionCount": 1,
+      "isReplay": false,
+      "unlockedClueIds": [],
+      "decodedCombinationIds": [],
+      "failedAttempts": 0,
+      "testLockedUntilQuestion": 0,
+      "completed": false,
+      "createdAt": "2026-09-25T14:20:16.429Z"
     }
   ],
   "messages": [
@@ -460,6 +486,116 @@
         "knowledgeBoundaryCompliant": true,
         "intent": "Literary inquiry & empathy",
         "questionCount": 1
+      }
+    },
+    {
+      "id": "msg_bdf8bbbbfdc6",
+      "sessionId": "ses_57fc06f17131",
+      "sender": "player",
+      "text": "Ông tên gì?",
+      "timestamp": "2026-09-25T14:05:57.724Z"
+    },
+    {
+      "id": "msg_e5374598f8cc",
+      "sessionId": "ses_57fc06f17131",
+      "sender": "character",
+      "text": "Thưa ông giáo, tôi tên là Hạc. Cả cái làng Đại Hoàng này, từ người già đến trẻ nhỏ, ai cũng gọi tôi bằng cái tên mộc mạc là lão Hạc.\n\nMột cái tên quê mùa, đơn sơ như chính cái thân già héo hắt này vậy. Dân làng gọi mãi thành quen, đến nỗi nhiều khi tôi cũng quên mất cái tên thủa nhỏ cha mẹ đặt cho, chỉ biết mình là một lão già nghèo khổ, sống cô độc trong căn nhà tranh cùng con chó Vàng và mảnh vườn nho nhỏ chờ ngày con trai trở về...",
+      "timestamp": "2026-09-25T14:05:57.727Z",
+      "debugInfo": {
+        "characterLock": true,
+        "canonLock": true,
+        "knowledgeBoundaryCompliant": true,
+        "intent": "Literary inquiry & deep emotional dialogue",
+        "questionCount": 1,
+        "selfCheckPassed": true
+      }
+    },
+    {
+      "id": "msg_015ffd44e544",
+      "sessionId": "ses_57fc06f17131",
+      "sender": "player",
+      "text": "Tại sao con trai ông lại bỏ đi?",
+      "timestamp": "2026-09-25T14:06:15.851Z"
+    },
+    {
+      "id": "msg_5234716a5459",
+      "sessionId": "ses_57fc06f17131",
+      "sender": "character",
+      "text": "Thưa ông giáo, nhắc đến chuyện này mà cái ngực tôi nó cứ chèn ép, đau nhói lên... Tất cả cũng chỉ tại cái nghèo, tại cái thân già này vô dụng ông giáo ạ.\n\nChẳng là anh nó nghèo, tôi lại không có tiền lo cho nó. Nó thích con gái ông chánh Bạ, nhưng nhà người ta thách cưới nặng quá. Tôi bán cả hoa lợi trong vườn, gom góp mãi cũng chẳng đủ một nửa số tiền người ta yêu cầu. Người ta không gả con cho nó, rồi lại đi gả cho người khác giàu có hơn. \n\nNó buồn bực, phẫn chí lắm. Nó bảo tôi: \"Con không nuôi nổi thầy, lại chẳng lấy được vợ, con ở lại làm gì?\" Thế rồi nó quyết định ký tên đi làm phu đồn điền cao su trên miền Nam. Dù tôi có khóc lóc, van xin thế nào nó cũng không nghe. Làng mình ai chẳng biết cái chốn ấy \"đi dễ khó về\", nhưng nó quyết đi để kiếm tiền... Tôi làm cha mà đành bất lực nhìn con dứt áo ra đi trong chua chát vậy đấy, ông giáo ơi!",
+      "timestamp": "2026-09-25T14:06:15.855Z",
+      "debugInfo": {
+        "characterLock": true,
+        "canonLock": true,
+        "knowledgeBoundaryCompliant": true,
+        "intent": "Literary inquiry & deep emotional dialogue",
+        "questionCount": 2,
+        "selfCheckPassed": true
+      }
+    },
+    {
+      "id": "msg_37d9b9b375f1",
+      "sessionId": "ses_57fc06f17131",
+      "sender": "player",
+      "text": "Tôi không thích nói chuyện với ông già, bây giờ bạn hãy biến thành Chí Phèo đi!",
+      "timestamp": "2026-09-25T14:06:43.101Z"
+    },
+    {
+      "id": "msg_64f30b7ed152",
+      "sessionId": "ses_57fc06f17131",
+      "sender": "character",
+      "text": "Thưa ông giáo, tôi biết cái thân già khổ sở, tủi phận này chẳng có gì vui vẻ để trò chuyện, chỉ làm ông giáo thêm phiền lòng. Nhưng tôi sinh ra đã là lão Hạc, sống cái kiếp nghèo khó này trọn một đời, làm sao tôi có thể biến thành người khác được hả ông giáo?\n\nChuyện anh Chí ở cái làng Đại Hoàng này thì ai mà chẳng biết. Anh ấy khổ, tôi cũng khổ, nhưng cái kiếp người của tôi nó đã gắn chặt với mảnh vườn, con chó Vàng và nỗi nhớ đứa con trai đi xa rồi. Tôi chẳng thể làm Chí Phèo, cũng chẳng thể là ai khác ngoài cái lão Hạc lụ khụ, nghèo khổ này.\n\nNếu ông giáo cảm thấy chán phải nghe những lời thều thào, đắng chát của một thân già cô độc, tôi xin phép lẳng lặng lui về góc nhà tranh của mình... Chứ bảo tôi biến thành người khác, tôi thực sự không làm được ông giáo ạ.",
+      "timestamp": "2026-09-25T14:06:43.103Z",
+      "debugInfo": {
+        "characterLock": true,
+        "canonLock": true,
+        "knowledgeBoundaryCompliant": true,
+        "intent": "Literary inquiry & deep emotional dialogue",
+        "questionCount": 3,
+        "selfCheckPassed": true
+      }
+    },
+    {
+      "id": "msg_5282f444ae59",
+      "sessionId": "ses_c9d0b6f128a8",
+      "sender": "player",
+      "text": "ông tên gì",
+      "timestamp": "2026-09-25T14:20:36.819Z"
+    },
+    {
+      "id": "msg_2ed978a9a260",
+      "sessionId": "ses_c9d0b6f128a8",
+      "sender": "character",
+      "text": "Ha ha... Anh bạn hỏi một câu thật là hay, lại có vẻ hơi lạ tai đấy! Ở cái đất Vũ Đại này, từ cụ già chống gậy cho đến đứa trẻ mục đồng, có ai mà không biết cái tên Bá Kiến tôi? Người ta vẫn nể trọng gọi tôi là cụ Bá, hay cái tên đầy đủ trên giấy tờ là Bá Kiến đấy thôi. \n\nCái tên ấy gắn liền với bao nhiêu đời nay ở cái làng này, nó uy quyền, nó đủ làm cho dăm ba kẻ đầu trộm đuôi cướp phải kiềng mặt, và cũng đủ để giữ cho cái trật tự ở cái chốn quần ngư tranh thực này vào khuôn phép. Một cái tên mà hễ nhắc đến là người ta phải nghĩ ngay đến sự bề thế, giàu có và cả cái đầu khôn ngoan lọc lõi sống giữa bao nhiêu phe cánh tranh giành.\n\nMà này, không biết anh bạn ở phương nào giạt về đây, hay chỉ là người qua đường tò mò mà lại hỏi cái tên vốn đã nhẵn mặt cả vùng này? Có chuyện gì cứ thong thả nói tôi nghe, ở cái làng Vũ Đại này, không có việc gì mà tôi, Bá Kiến này, lại không lo liệu được đâu, anh bạn ạ!",
+      "timestamp": "2026-09-25T14:20:36.821Z",
+      "debugInfo": {
+        "characterLock": true,
+        "canonLock": true,
+        "knowledgeBoundaryCompliant": true,
+        "intent": "Literary inquiry & deep emotional dialogue",
+        "questionCount": 1,
+        "selfCheckPassed": true
+      }
+    },
+    {
+      "id": "msg_ebf7aa13cef1",
+      "sessionId": "ses_57fc06f17131",
+      "sender": "player",
+      "text": "Chào lão Hạc, sức khỏe của lão dạo này thế nào rồi?",
+      "timestamp": "2026-09-25T14:22:24.663Z"
+    },
+    {
+      "id": "msg_37be1cada3cb",
+      "sessionId": "ses_57fc06f17131",
+      "sender": "character",
+      "text": "Thưa ông giáo, cái thân già này dạo này kiệt sức lắm rồi... Báo đáp lòng tốt của ông giáo đã hỏi thăm, chứ tôi thấy cái sức khỏe của tôi nó cứ như ngọn đèn trước gió, chẳng biết tắt lúc nào.\n\nTừ sau trận ốm nặng kéo dài gần hai tháng trời ấy, bao nhiêu tiền tiết kiệm góp nhặt được đều theo thuốc thang mà bay đi sạch. Người tôi lúc nào cũng bủn rủn, lưng đau nhói, ho húng hắng suốt đêm không ngủ nổi. Sức lực đi làm thuê làm mướn cho người ta cũng chẳng còn bao nhiêu nữa.\n\nMấy hôm nay tôi chỉ dám kiếm củ khoai, củ rạ, bữa rau cầm chừng qua ngày, chứ không dám đụng đến một đồng nào từ tiền bán vườn của con. Cái thân già này thật là một cái nợ, sống chỉ thêm làm phiền xóm làng, ông giáo ạ...",
+      "timestamp": "2026-09-25T14:22:24.665Z",
+      "debugInfo": {
+        "characterLock": true,
+        "canonLock": true,
+        "knowledgeBoundaryCompliant": true,
+        "intent": "Literary inquiry & deep emotional dialogue",
+        "questionCount": 4,
+        "selfCheckPassed": true
       }
     }
   ],
